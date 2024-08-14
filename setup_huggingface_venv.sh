@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Update package list and install the venv package (uncomment if necessary)
-#sudo apt-get update
-#sudo apt-get install python3-venv  # or just python3-venv if using the default python version
-
 # Name of the virtual environment
 ENV_NAME="huggingface_venv"
 
@@ -16,14 +12,13 @@ ENV_DIR="./${ENV_NAME}"
 # Requirements file name
 REQUIREMENTS_FILE="requirements.txt"
 
-# Hugging Face Transformers version
+# Packages to install
 TRANSFORMERS_VERSION="transformers"
-
-# Tokenizers version
 TOKENIZERS_VERSION="tokenizers"
-
-# Datasets version
 DATASETS_VERSION="datasets"
+
+# Set default index URL for PyTorch packages if needed (e.g., for CPU)
+PYTORCH_INDEX_URL="https://download.pytorch.org/whl/cpu"
 
 echo "Setting up a virtual environment for Hugging Face..."
 
@@ -39,12 +34,19 @@ echo "Virtual environment '${ENV_NAME}' created."
 source ${ENV_DIR}/bin/activate
 
 # Upgrade pip
+echo "Upgrading pip..."
 pip install --upgrade pip
 
 # Install Hugging Face libraries
+echo "Installing Hugging Face libraries..."
 pip install ${TRANSFORMERS_VERSION} ${TOKENIZERS_VERSION} ${DATASETS_VERSION}
 
-# Optionally, you can create a requirements file
+# Install PyTorch with CPU support (uncomment if needed)
+# echo "Installing PyTorch with CPU support..."
+# pip install torch torchvision torchaudio --index-url ${PYTORCH_INDEX_URL}
+
+# Optionally, create a requirements file
+echo "Creating requirements file..."
 pip freeze > ${REQUIREMENTS_FILE}
 echo "Requirements file '${REQUIREMENTS_FILE}' created."
 
