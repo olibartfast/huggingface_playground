@@ -26,4 +26,5 @@ Huggingface playground on models from https://huggingface.co/tasks
 ### Hugging Face on Amazon SageMaker
 https://huggingface.co/docs/sagemaker/index
 
-
+### Hugging Face on Nvidia Triton Server
+https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace
