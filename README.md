@@ -1,4 +1,5 @@
 # huggingface_playground
+Huggingface playground on models from https://huggingface.co/tasks
 
 ### Huggingface virtual env setup instructions
 
@@ -20,3 +21,9 @@
 
 3. **Installing additional packages**:
    You can add more packages to the `pip install` command or manually edit the `requirements.txt` file.
+
+
+### Hugging Face on Amazon SageMaker
+https://huggingface.co/docs/sagemaker/index
+
+
