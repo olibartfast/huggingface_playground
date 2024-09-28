@@ -23,8 +23,14 @@ Huggingface playground on models from https://huggingface.co/tasks
    You can add more packages to the `pip install` command or manually edit the `requirements.txt` file.
 
 
-### Hugging Face on Amazon SageMaker
-https://huggingface.co/docs/sagemaker/index
-
 ### Hugging Face on Nvidia Triton Server
 https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace
+
+### Hugging Face - Learn
+https://huggingface.co/learn
+
+### Hugging Face - Documentation (Hub client library, Transformers, Diffusers, Sagemaker...)
+https://huggingface.co/docs
+
+### deeplearning.ai courses
+https://www.deeplearning.ai/short-courses/open-source-models-hugging-face/
