@@ -28,6 +28,9 @@ https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace
 ### Hugging Face - Learn
 https://huggingface.co/learn
 
+### LLMs
+https://www.philschmid.de/fine-tune-multimodal-llms-with-trl
+
 ### Hugging Face - Documentation (Hub client library, Transformers, Diffusers, Sagemaker...)
 https://huggingface.co/docs
 
