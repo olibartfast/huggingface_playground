@@ -1,5 +1,4 @@
-# huggingface_playground
-Huggingface playground on models from https://huggingface.co/tasks
+### Huggingface playground on models from https://huggingface.co/tasks and other resources
 
 ### Huggingface virtual env setup instructions
 
