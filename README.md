@@ -21,19 +21,20 @@
 3. **Installing additional packages**:
    You can add more packages to the `pip install` command or manually edit the `requirements.txt` file.
 
-
-### Hugging Face on Nvidia Triton Server
-https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace
-
-### Hugging Face - Learn
+### Learn
 https://huggingface.co/learn
 
-### Hugging Face and Pytorch tutorials 
+### Documentation (Hub client library, Transformers, Diffusers, Sagemaker...)
+https://huggingface.co/docs
+
+### Deep Learning Containers
+https://huggingface.co/docs/sagemaker/index#deep-learning-containers
+
+### Pytorch tutorials 
 https://github.com/philschmid/deep-learning-pytorch-huggingface
 
-
-### Hugging Face - Documentation (Hub client library, Transformers, Diffusers, Sagemaker...)
-https://huggingface.co/docs
+### Nvidia Triton Server
+https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace
 
 ### deeplearning.ai courses
 https://www.deeplearning.ai/short-courses/open-source-models-hugging-face/
