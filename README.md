@@ -28,7 +28,9 @@ https://huggingface.co/learn
 https://huggingface.co/docs
 
 ### Deep Learning Containers
-https://huggingface.co/docs/sagemaker/index#deep-learning-containers
+   - Amazon Sagemaker: https://huggingface.co/docs/sagemaker/index#deep-learning-containers
+   - Google Cloud: https://huggingface.co/docs/google-cloud/containers/available
+   
 
 ### Pytorch tutorials 
 https://github.com/philschmid/deep-learning-pytorch-huggingface
