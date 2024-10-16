@@ -22,10 +22,10 @@
    You can add more packages to the `pip install` command or manually edit the `requirements.txt` file.
 
 ### Learn
-https://huggingface.co/learn
+   - https://huggingface.co/learn
 
 ### Documentation (Hub client library, Transformers, Diffusers, Sagemaker...)
-https://huggingface.co/docs
+   - https://huggingface.co/docs
 
 ### Deep Learning Containers
    - Amazon Sagemaker: https://huggingface.co/docs/sagemaker/index#deep-learning-containers
@@ -33,10 +33,10 @@ https://huggingface.co/docs
    
 
 ### Pytorch tutorials 
-https://github.com/philschmid/deep-learning-pytorch-huggingface
+   - https://github.com/philschmid/deep-learning-pytorch-huggingface
 
 ### Nvidia Triton Server
-https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace
+   - https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace
 
 ### deeplearning.ai courses
-https://www.deeplearning.ai/short-courses/open-source-models-hugging-face/
+   - https://www.deeplearning.ai/short-courses/open-source-models-hugging-face/
