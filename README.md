@@ -28,8 +28,11 @@
    - https://huggingface.co/docs
 
 ### Deep Learning Containers
-   - Amazon Sagemaker: https://huggingface.co/docs/sagemaker/index#deep-learning-containers
-   - Google Cloud: https://huggingface.co/docs/google-cloud/containers/available
+   - Amazon Sagemaker:
+      - https://huggingface.co/docs/sagemaker/index#deep-learning-containers
+      - https://www.philschmid.de/sagemaker-llama32-vision    
+   - Google Cloud:
+      - https://huggingface.co/docs/google-cloud/containers/available
    
 
 ### Pytorch tutorials 
