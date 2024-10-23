@@ -1,4 +1,4 @@
-### Huggingface playground on models from https://huggingface.co/tasks and other resources
+### Huggingface experimental/research/playground on models from https://huggingface.co/tasks and other resources
 
 
 ### Learn
