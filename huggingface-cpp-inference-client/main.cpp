@@ -8,7 +8,6 @@
 #include <nlohmann/json.hpp>
 #include <opencv2/opencv.hpp>
 
-// Assuming these are your custom headers
 #include "huggingface_task.hpp"
 
 namespace fs = std::filesystem;
