@@ -31,5 +31,5 @@ std::string ObjectDetection::execute() {
                   << "(" << obj["box"]["xmax"] << ", " << obj["box"]["ymax"] << ")\n";
     }
     
-    return response;
+    return result.dump();
 }

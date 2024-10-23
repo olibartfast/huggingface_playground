@@ -9,7 +9,7 @@ public:
     ImageProcessing() = default;
     ~ImageProcessing() = default;
 
-    static std::string encodeImage(const std::string& image_path, int target_size);
+    static std::string encodeImage(const std::string& image_path, int target_size, bool resize = false);
 
     // Public methods for testing
     static cv::Mat readImage(const std::string& image_path);

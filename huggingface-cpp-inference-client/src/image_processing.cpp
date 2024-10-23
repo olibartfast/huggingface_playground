@@ -1,12 +1,18 @@
 #include "image_processing.hpp"
 #include <stdexcept>
 
-std::string ImageProcessing::encodeImage(const std::string& image_path, int target_size) {
+std::string ImageProcessing::encodeImage(const std::string& image_path, int target_size, bool resize) {
     cv::Mat image = readImage(image_path);
-    cv::Mat resized_image = resizeImage(image, target_size);
-    cv::Mat squared_image = createSquareCanvas(resized_image, target_size);
-    std::vector<unsigned char> jpg_data = encodeToJpg(squared_image);
-    return encodeToBase64(jpg_data);
+
+    if (resize) {
+        cv::Mat resized_image = resizeImage(image, target_size);
+        cv::Mat squared_image = createSquareCanvas(resized_image, target_size);
+        std::vector<unsigned char> jpg_data = encodeToJpg(squared_image);
+        return encodeToBase64(jpg_data);
+    } else {
+        std::vector<unsigned char> jpg_data = encodeToJpg(image);
+        return encodeToBase64(jpg_data);
+    }
 }
 
 cv::Mat ImageProcessing::readImage(const std::string& image_path) {
