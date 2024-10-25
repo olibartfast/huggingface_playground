@@ -13,6 +13,7 @@
 #include "object_detection.hpp"
 #include "image_segmentation.hpp"
 #include "image_processing.hpp"
+#include <cxxopts.hpp>
 
 namespace fs = std::filesystem;
 
@@ -130,33 +131,49 @@ Result<nlohmann::json> executeTask(const std::string& taskType,
 }
 
 
-int main() {
+int main(int argc, char** argv) 
+{
+    cxxopts::Options options("Hugging Face Serverless API C++ Inference client", "Explore the most popular huggingface models with a single API request");
+    options.add_options()
+        ("h,help", "Print help")
+        ("i,input", "Input source", cxxopts::value<std::string>());
+        ("t,task", "Task type", cxxopts::value<std::string>());
+        ("m,model", "Model name", cxxopts::value<std::string>());
+
+    auto result = options.parse(argc, argv);
+
+    if (result.count("help")) {
+        std::cout << options.help() << std::endl;
+        return 0;
+    }
+
+
     auto authToken = getEnvVar("HF_TOKEN");
     if (!authToken) {
         std::cerr << "Error: HF_TOKEN environment variable is not set." << std::endl;
         return 1;
     }
 
-    const fs::path image_path = "download2.png";
+    const fs::path image_path = result["input"].as<std::string>();
     if (!fs::exists(image_path)) {
         std::cerr << "Error: Image file does not exist." << std::endl;
         return 1;
     }
 
 
-    const std::string taskType = "image-segmentation";
+    const std::string taskType = result["task"].as<std::string>();
 
     if (taskType == "object-detection") {
         const auto objectDetectionResult = executeTask(
-            "object-detection",
+            taskType,
             "https://api-inference.huggingface.co/models/facebook/detr-resnet-50",
             *authToken,
             nlohmann::json{{"image_path", image_path.string()}, {"threshold", 0.7}}
         );
-        processResult(objectDetectionResult, "object-detection", image_path.string());
+        processResult(objectDetectionResult, taskType, image_path.string());
     } else if (taskType == "image-segmentation") {
-        const auto ImageSegmentationResult = executeTask(
-            "instance-segmentation",
+        const auto imageSegmentationResult = executeTask(
+            taskType,
             "https://api-inference.huggingface.co/models/nvidia/segformer-b0-finetuned-ade-512-512",
             *authToken,
             nlohmann::json{
@@ -168,16 +185,16 @@ int main() {
             }
         );
 
-        processResult(ImageSegmentationResult, "image-segmentation", image_path.string());
+        processResult(imageSegmentationResult, taskType, image_path.string());
     }
     else if (taskType == "image-classification") {
         const auto imageClassificationResult = executeTask(
-            "image-classification",
+            taskType,
             "https://api-inference.huggingface.co/models/google/vit-base-patch16-224",
             *authToken,
             nlohmann::json{{"image_path", image_path.string()}}
         );
-        processResult(imageClassificationResult, "image-classification", image_path.string());
+        processResult(imageClassificationResult, taskType, image_path.string());
     }
     else {
         std::cerr << "Error: Invalid task type." << std::endl;

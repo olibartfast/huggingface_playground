@@ -20,6 +20,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(cpp_base64)
 message(STATUS "cpp_base64_SOURCE_DIR: ${cpp_base64_SOURCE_DIR}")
 
+# Add cxxopts
+include(FetchContent)
+FetchContent_Declare(
+  cxxopts
+  GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
+  GIT_TAG v3.0.0  # You might want to specify a specific commit or tag for stability
+)
+FetchContent_MakeAvailable(cxxopts)
+message(STATUS "cxxopts_SOURCE_DIR: ${cxxopts_SOURCE_DIR}")
 
 # Include directories
 
@@ -37,7 +46,11 @@ add_library(huggingface_lib
 
 # Link libraries
 target_link_libraries(huggingface_lib PRIVATE CURL::libcurl nlohmann_json::nlohmann_json   ${OpenCV_LIBS})
-target_include_directories(huggingface_lib PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${cpp_base64_SOURCE_DIR} ${OpenCV_INCLUDE_DIRS})
+target_include_directories(huggingface_lib PRIVATE
+     ${CMAKE_CURRENT_SOURCE_DIR}/include        
+     ${cpp_base64_SOURCE_DIR} 
+     ${OpenCV_INCLUDE_DIRS}
+     )
 
 # Add main executable
 add_executable(huggingface_app main.cpp)
@@ -47,6 +60,8 @@ target_include_directories(huggingface_app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${OpenCV_INCLUDE_DIRS}
     ${cpp_base64_SOURCE_DIR} 
+    ${cxxopts_SOURCE_DIR}/include
+
 )
 
 # Link libraries for the main executable
