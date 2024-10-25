@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <opencv2/opencv.hpp>
-#include "base64.h"
+
 
 class ImageProcessing {
 public:
@@ -17,6 +17,7 @@ public:
     static cv::Mat createSquareCanvas(const cv::Mat& image, int target_size);
     static std::vector<unsigned char> encodeToJpg(const cv::Mat& image);
     static std::string encodeToBase64(const std::vector<unsigned char>& data);
+    static std::vector<unsigned char> decodeBase64(const std::string& encoded_string);
 
 private:
     static cv::Size calculateNewSize(const cv::Mat& image, int target_size);

@@ -1,4 +1,5 @@
 #include "image_processing.hpp"
+#include "base64.h" 
 #include <stdexcept>
 
 std::string ImageProcessing::encodeImage(const std::string& image_path, int target_size, bool resize) {
@@ -49,6 +50,11 @@ std::vector<unsigned char> ImageProcessing::encodeToJpg(const cv::Mat& image) {
 
 std::string ImageProcessing::encodeToBase64(const std::vector<unsigned char>& data) {
     return base64_encode(data.data(), data.size());
+}
+
+std::vector<unsigned char> ImageProcessing::decodeBase64(const std::string& encoded_string) {
+    std::string decoded = base64_decode(encoded_string);
+    return std::vector<unsigned char>(decoded.begin(), decoded.end());
 }
 
 cv::Size ImageProcessing::calculateNewSize(const cv::Mat& image, int target_size) {

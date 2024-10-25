@@ -29,6 +29,7 @@ add_library(huggingface_lib
     src/huggingface_task.cpp
     src/object_detection.cpp
     src/image_classification.cpp
+    src/image_segmentation.cpp
     src/image_processing.cpp
     ${cpp_base64_SOURCE_DIR}/base64.cpp
     # Add other task implementations here
