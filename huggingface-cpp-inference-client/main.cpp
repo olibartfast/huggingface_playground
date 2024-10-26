@@ -12,6 +12,7 @@
 #include "image_classification.hpp"
 #include "object_detection.hpp"
 #include "image_segmentation.hpp"
+#include "image_text_to_text.hpp"
 #include "image_processing.hpp"
 #include <cxxopts.hpp>
 
@@ -130,14 +131,13 @@ Result<nlohmann::json> executeTask(const std::string& taskType,
     }
 }
 
-
 int main(int argc, char** argv) 
 {
     cxxopts::Options options("Hugging Face Serverless API C++ Inference client", "Explore the most popular huggingface models with a single API request");
     options.add_options()
         ("h,help", "Print help")
-        ("i,input", "Input source", cxxopts::value<std::string>());
-        ("t,task", "Task type", cxxopts::value<std::string>());
+        ("i,input", "Input source", cxxopts::value<std::string>())
+        ("t,task", "Task type", cxxopts::value<std::string>())
         ("m,model", "Model name", cxxopts::value<std::string>());
 
     auto result = options.parse(argc, argv);
@@ -195,6 +195,18 @@ int main(int argc, char** argv)
             nlohmann::json{{"image_path", image_path.string()}}
         );
         processResult(imageClassificationResult, taskType, image_path.string());
+    }
+    else if (taskType == "image-text-to-text") {
+        ImageTextToText task(
+            "https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct",
+            *authToken,
+            {image_path.string()},
+            "Describe this image in one sentence.",
+            512,
+            true
+        );
+        std::string response = task.execute();
+        std::cout << "Response: " << response << std::endl;
     }
     else {
         std::cerr << "Error: Invalid task type." << std::endl;

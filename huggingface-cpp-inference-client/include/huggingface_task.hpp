@@ -18,23 +18,7 @@ public:
     HuggingFaceTask(const std::string& endpoint, const std::string& authToken);
     virtual ~HuggingFaceTask() = default;
 
-    virtual std::string execute() {
-        CurlWrapper curl;
-        nlohmann::json payload = preparePayload();
-        std::string payloadStr = payload.dump();
-
-        try {
-            std::string response = curl.setUrl(apiEndpoint)
-                .setPostFields(payloadStr)
-                .addHeader("Content-Type: application/json")
-                .addHeader("Authorization: Bearer " + token)
-                .perform();
-
-            return response;
-        } catch (const std::exception& e) {
-            throw std::runtime_error(std::string("HTTP request failed: ") + e.what());
-        }
-    }
+    virtual std::string execute();
 };
 
 class HuggingFaceTaskFactory {
