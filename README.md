@@ -1,5 +1,9 @@
 ### Huggingface experimental/research/playground on models from https://huggingface.co/tasks and other resources
 
+### Serverless api
+- https://huggingface.co/docs/api-inference/index
+- [Inference API C++ client example](huggingface-cpp-inference-client)   
+
 
 ### Learn
    - https://huggingface.co/learn
