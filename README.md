@@ -24,5 +24,7 @@
 ### Nvidia Triton Server
    - https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace
 
-### deeplearning.ai courses
+### Courses
    - https://www.deeplearning.ai/short-courses/open-source-models-hugging-face/
+   - https://huggingface.co/learn/computer-vision-course/unit0/welcome/welcome
+   - https://huggingface.co/learn/ml-for-3d-course/unit0/introduction
