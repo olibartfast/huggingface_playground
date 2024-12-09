@@ -28,3 +28,4 @@
    - https://www.deeplearning.ai/short-courses/open-source-models-hugging-face/
    - https://huggingface.co/learn/computer-vision-course/unit0/welcome/welcome
    - https://huggingface.co/learn/ml-for-3d-course/unit0/introduction
+   - https://www.udemy.com/course/transformers-in-computer-vision-english-version
