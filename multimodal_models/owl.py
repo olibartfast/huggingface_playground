@@ -1,3 +1,5 @@
+# https://huggingface.co/docs/transformers/en/model_doc/owlvit
+# https://huggingface.co/docs/transformers/en/model_doc/owlv2
 import requests
 from PIL import Image
 import torch
