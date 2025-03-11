@@ -1,0 +1,3 @@
+transformers
+sam2
+huggingface_hub
