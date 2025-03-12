@@ -1,3 +1,7 @@
+# https://huggingface.co/facebook/sam2-hiera-large
+# https://huggingface.co/docs/transformers/en/model_doc/rt_detr_v2
+# rtdetrv2 is used to feed  bounding boxes to samv2
+# for other promptless input methods check https://github.com/facebookresearch/sam2/blob/main/notebooks/automatic_mask_generator_example.ipynb
 import torch
 import requests
 from PIL import Image, ImageDraw
