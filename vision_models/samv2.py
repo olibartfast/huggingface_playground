@@ -6,52 +6,23 @@ import torch
 import requests
 from PIL import Image, ImageDraw
 from transformers import RTDetrV2ForObjectDetection, RTDetrImageProcessor
-from sam2.sam2_image_predictor import SAM2ImagePredictor #pip install sam2
+from sam2.sam2_image_predictor import SAM2ImagePredictor  # pip install sam2
 
 import numpy as np
 import cv2
+import os
 
-# Load RT-DETRv2 model and processor
-url = 'http://images.cocodataset.org/val2017/000000039769.jpg'
-image = Image.open(requests.get(url, stream=True).raw)
+# --- Configuration ---
+IMAGE_URL = 'http://images.cocodataset.org/val2017/000000039769.jpg'
+OUTPUT_DIR = "output"  # Directory to save the output images
+DETECTION_THRESHOLD = 0.5
+MASK_ALPHA = 0.5  # Transparency of the mask overlay
 
-image_processor = RTDetrImageProcessor.from_pretrained("PekingU/rtdetr_v2_r18vd")
-model = RTDetrV2ForObjectDetection.from_pretrained("PekingU/rtdetr_v2_r18vd")
-
-inputs = image_processor(images=image, return_tensors="pt")
-
-with torch.no_grad():
-    outputs = model(**inputs)
-
-results = image_processor.post_process_object_detection(outputs, target_sizes=torch.tensor([(image.height, image.width)]), threshold=0.5)
-
-# Prepare bounding boxes for SAM
-bounding_boxes = []
-labels = []
-for result in results:
-    for score, label_id, box in zip(result["scores"], result["labels"], result["boxes"]):
-        score, label = score.item(), label_id.item()
-        box = [round(i, 2) for i in box.tolist()]
-        bounding_boxes.append(box)
-        labels.append(model.config.id2label[label])
-        print(f"{model.config.id2label[label]}: {score:.2f} ")
-
-# Convert bounding boxes to the format expected by SAM (xyxy -> xywh if needed, and normalized coordinates)
-sam_boxes = []
-for box in bounding_boxes:
-    x1, y1, x2, y2 = box
-    # SAM usually expects normalized coordinates (0-1)
-    x1_norm = x1 / image.width
-    y1_norm = y1 / image.height
-    x2_norm = x2 / image.width
-    y2_norm = y2 / image.height
-    sam_boxes.append([x1_norm, y1_norm, x2_norm, y2_norm])
-
-print("\nBounding boxes for SAM (normalized xyxy):", sam_boxes)
-print("Labels:", labels)
+# Create output directory if it doesn't exist
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-# --- Visualization (Optional, but highly recommended for debugging) ---
+# --- Helper Functions ---
 def visualize_boxes(image, boxes, labels):
     """Visualizes bounding boxes on the image."""
     draw = ImageDraw.Draw(image)
@@ -67,63 +38,142 @@ def visualize_boxes(image, boxes, labels):
         draw.text((x1, y1 - 10), label, fill="red")  # Display the label
     return image
 
-# Visualize the normalized boxes (for debugging)
-visualization_image = image.copy()  # Create a copy to draw on
+
+def visualize_masks(image, masks, boxes, labels, alpha=0.5):
+    """Visualizes masks and bounding boxes on the image."""
+    image_np = np.array(image)
+    overlay = image_np.copy()
+    for mask, box, label in zip(masks, boxes, labels):
+        # Draw the mask
+        color = np.array([30, 144, 255], dtype=np.uint8)  # Example color (blue)
+        overlay[mask.squeeze() == True] = color  # Added .squeeze()
+
+        # Draw the bounding box (denormalize first)
+        x1, y1, x2, y2 = box
+        x1 *= image.width
+        y1 *= image.height
+        x2 *= image.width
+        y2 *= image.height
+        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)  # Convert to integers
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box
+        cv2.putText(
+            overlay, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2
+        )
+
+    # Blend the overlay with the original image
+    output = cv2.addWeighted(overlay, alpha, image_np, 1 - alpha, 0)
+    return Image.fromarray(output)
+
+
+# --- Load Image ---
+try:
+    image = Image.open(requests.get(IMAGE_URL, stream=True).raw)
+except requests.exceptions.RequestException as e:
+    print(f"Error downloading image: {e}")
+    exit()
+except Exception as e:
+    print(f"Error opening image: {e}")
+    exit()
+
+
+# --- RT-DETRv2 Object Detection ---
+image_processor = RTDetrImageProcessor.from_pretrained("PekingU/rtdetr_v2_r18vd")
+model = RTDetrV2ForObjectDetection.from_pretrained("PekingU/rtdetr_v2_r18vd")
+
+inputs = image_processor(images=image, return_tensors="pt")
+
+with torch.no_grad():
+    outputs = model(**inputs)
+
+results = image_processor.post_process_object_detection(
+    outputs,
+    target_sizes=torch.tensor([(image.height, image.width)]),
+    threshold=DETECTION_THRESHOLD,
+)
+
+# Prepare bounding boxes and labels
+bounding_boxes = []
+labels = []
+for result in results:
+    for score, label_id, box in zip(result["scores"], result["labels"], result["boxes"]):
+        score, label = score.item(), label_id.item()
+        box = [round(i, 2) for i in box.tolist()]
+        bounding_boxes.append(box)
+        labels.append(model.config.id2label[label])
+        print(f"{model.config.id2label[label]}: {score:.2f} ")
+
+# Convert bounding boxes to normalized xyxy format
+sam_boxes = []
+for box in bounding_boxes:
+    x1, y1, x2, y2 = box
+    x1_norm = x1 / image.width
+    y1_norm = y1 / image.height
+    x2_norm = x2 / image.width
+    y2_norm = y2 / image.height
+    sam_boxes.append([x1_norm, y1_norm, x2_norm, y2_norm])
+
+print("\nBounding boxes for SAM (normalized xyxy):", sam_boxes)
+print("Labels:", labels)
+
+
+# --- Visualize Detected Objects (Optional) ---
+visualization_image = image.copy()
 visualized_image = visualize_boxes(visualization_image, sam_boxes, labels)
-visualized_image.show()
-# --- End of Visualization ---
+visualized_image.save(os.path.join(OUTPUT_DIR, "detected_objects.png"))
+print(f"Saved detected objects image to: {os.path.join(OUTPUT_DIR, 'detected_objects.png')}")
 
 
-# --- Integration with SAM2 ---
+# --- SAM2 Segmentation ---
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 try:
-    predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-large").to(device)
-
-    # Convert PIL Image to numpy array (REQUIRED for SAM) and to RGB
+    predictor = SAM2ImagePredictor.from_pretrained("facebook/sam2-hiera-tiny")
     image_np = np.array(image.convert("RGB"))
-
     predictor.set_image(image_np)
+    input_boxes = np.array(bounding_boxes)  # Already in xyxy format
+    with torch.inference_mode():
+        masks, scores, _ = predictor.predict(
+            point_coords=None,
+            point_labels=None,
+            box=input_boxes,
+            multimask_output=False
+        )
 
-    # Prepare prompts:  sam_boxes are already normalized xyxy
-    prompts = {
-        "boxes": torch.tensor(sam_boxes, device=device),
-        "box_labels": torch.tensor([0] * len(sam_boxes), device=device),  #  0 for foreground, 1 for background.  All foreground here.
-    }
+    # --- Save Image with Masks and Bounding Boxes to Disk ---
+    def show_mask(mask, image_np, random_color=False, alpha=0.5):
+        """Helper function to overlay mask on image."""
+        if random_color:
+            color = np.concatenate([np.random.random(3) * 255, np.array([alpha * 255])], axis=0)
+        else:
+            color = np.array([30, 144, 255, alpha * 255], dtype=np.uint8)  # Blue with alpha
+        h, w = mask.shape[-2:]
+        mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
+        return mask_image.astype(np.uint8)
 
-    with torch.inference_mode(), torch.autocast(device, dtype=torch.bfloat16 if device == "cuda" else torch.float32): # Use bfloat16 if on CUDA
-        masks, _, _ = predictor.predict(prompts)
-
-    masks = masks.cpu().numpy()
-
-    # --- Visualize Masks ---
-    def visualize_masks(image, masks, boxes, labels, alpha=0.5):
-        """Visualizes masks and bounding boxes on the image."""
+    def save_masks_to_image(image, masks, boxes, labels, output_path="output_with_masks.jpg", alpha=0.5):
+        """Saves the image with masks and bounding boxes to disk."""
         image_np = np.array(image)
         overlay = image_np.copy()
         for mask, box, label in zip(masks, boxes, labels):
-            # Draw the mask
-            color = np.array([30, 144, 255], dtype=np.uint8)  # Example color (blue)
-            overlay[mask == True] = color
+            mask_image = show_mask(mask, image_np)
+            overlay = cv2.addWeighted(overlay, 1.0, mask_image[:, :, :3], alpha, 0)
 
-            # Draw the bounding box (denormalize first)
+            # Draw bounding box (already in pixel coordinates)
             x1, y1, x2, y2 = box
-            x1 *= image.width
-            y1 *= image.height
-            x2 *= image.width
-            y2 *= image.height
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)  # Convert to integers
-            cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box
-            cv2.putText(overlay, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0,255,0), 2)
+            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+            cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(overlay, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
-        # Blend the overlay with the original image
-        output = cv2.addWeighted(overlay, alpha, image_np, 1 - alpha, 0)
-        return Image.fromarray(output)
+        output_image = Image.fromarray(overlay)
+        output_image.save(output_path)
+        print(f"Image with masks and bounding boxes saved to {output_path}")
 
-    visualized_image_with_masks = visualize_masks(image, masks, sam_boxes, labels)
-    visualized_image_with_masks.show()
+    save_masks_to_image(image, masks, bounding_boxes, labels, "output_with_masks.jpg")
+
 
 except ImportError as e:
-    print(f"Error: {e}.  Make sure you have the 'sam2' library installed (`pip install sam2`).")
+    print(
+        f"Error: {e}.  Make sure you have the 'sam2' library installed (`pip install sam2`)."
+    )
 except Exception as e:
     print(f"An unexpected error occurred: {e}")
