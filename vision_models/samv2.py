@@ -27,8 +27,6 @@ class SAM2Segmentor:
             ) from e
         except Exception as e:
             raise Exception(f"Error loading SAM2: {e}") from e
-
-        # Crucially, *NO* self.predictor.to(self.device) here.
         self.image_set = False
 
     def set_image(self, image: Image.Image):
