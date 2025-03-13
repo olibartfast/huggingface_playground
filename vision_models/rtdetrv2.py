@@ -2,10 +2,10 @@ import torch
 from PIL import Image
 from transformers import RTDetrV2ForObjectDetection, RTDetrImageProcessor
 import numpy as np
-import argparse  # Import argparse
+import argparse 
 import requests
 import os
-from PIL import Image, ImageDraw  # Import PIL components
+from PIL import Image, ImageDraw 
 
 
 class RTDetrDetector:
