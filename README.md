@@ -29,3 +29,6 @@
    - https://huggingface.co/learn/computer-vision-course/unit0/welcome/welcome
    - https://huggingface.co/learn/ml-for-3d-course/unit0/introduction
    - https://www.udemy.com/course/transformers-in-computer-vision-english-version
+
+### Transformers notebooks
+   - https://github.com/qubvel/transformers-notebooks/tree/main/notebooks
