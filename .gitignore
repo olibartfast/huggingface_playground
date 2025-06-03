@@ -5,3 +5,4 @@ owlvit_onnx
 huggingface-cpp-inference-client/*.png
 huggingface-cpp-inference-client/*.jpg
 huggingface-cpp-inference-client/*.jpeg
+owl2_onnx
