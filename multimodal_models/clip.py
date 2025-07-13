@@ -35,56 +35,6 @@ class CLIPZeroShotClassifier:
             'predicted_probability': probabilities.max().item()
         }
 
-def get_torch_dtype(dtype_str):
-    """Convert string to torch dtype."""
-    return {"float32": torch.float32, "float16": torch.float16, "bfloat16": torch.bfloat16}.get(dtype_str, torch.bfloat16)
-
-def get_device(device_str):
-    """Get the appropriate device."""
-    return 0 if device_str == "auto" and torch.cuda.is_available() else device_str
-
-def setup_pipeline(model_name, torch_dtype, device):
-    """Sets up the pipeline for zero-shot image classification."""
-    return pipeline(task="zero-shot-image-classification", model=model_name, torch_dtype=torch_dtype, device=device)
-
-def setup_automodel(model_name, torch_dtype):
-    """Sets up the processor and model using AutoModel approach."""
-    processor = AutoProcessor.from_pretrained(model_name)
-    model = AutoModel.from_pretrained(model_name, torch_dtype=torch_dtype, attn_implementation="sdpa")
-    return processor, model
-
-def process_results(outputs, labels, method="pipeline"):
-    """Process inference results for all methods."""
-    if method == "pipeline":
-        # Pipeline returns results sorted by score, need to reorder to match input labels
-        scores = []
-        for label in labels:
-            for result in outputs:
-                if result['label'] == label:
-                    scores.append(result['score'])
-                    break
-            else:
-                scores.append(0.0)  # If label not found
-        top_label = outputs[0]['label']
-        top_score = outputs[0]['score']
-    else:  # AutoModel or CLIPZeroShotClassifier
-        probs = outputs['probabilities'] if method == "clip_class" else outputs.softmax(dim=1)[0].tolist()
-        scores = probs
-        top_label = labels[np.argmax(probs)]
-        top_score = max(probs)
-    return top_label, top_score, scores
-
-def pipeline_inference(clip_pipeline, image, labels):
-    """Perform inference using pipeline approach."""
-    return clip_pipeline(image, candidate_labels=labels)
-
-def automodel_inference(processor, model, image, labels):
-    """Perform inference using AutoModel approach."""
-    inputs = processor(text=labels, images=image, return_tensors="pt", padding=True)
-    with torch.no_grad():
-        outputs = model(**inputs)
-    return outputs.logits_per_image
-
 def create_results_plot(labels, probabilities):
     """Create a bar plot of the classification probabilities."""
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -122,6 +72,71 @@ def display_results(labels, scores, predicted_label, predicted_score, threshold=
             print(f"  {label}: {score:.4f}")
     print(f"\nPredicted Label: {predicted_label} ({predicted_score*100:.2f}%)")
 
+
+def get_torch_dtype(dtype_str):
+    """Convert string to torch dtype."""
+    return {"float32": torch.float32, "float16": torch.float16, "bfloat16": torch.bfloat16}.get(dtype_str, torch.bfloat16)
+
+def get_device(device_str):
+    """Get the appropriate device."""
+    return 0 if device_str == "auto" and torch.cuda.is_available() else device_str
+
+def setup_pipeline(model_name, torch_dtype, device):
+    """Sets up the pipeline for zero-shot image classification."""
+    return pipeline(task="zero-shot-image-classification", model=model_name, torch_dtype=torch_dtype, device=device)
+
+def setup_automodel(model_name, torch_dtype):
+    """Sets up the processor and model using AutoModel approach."""
+    processor = AutoProcessor.from_pretrained(model_name)
+    model = AutoModel.from_pretrained(model_name, torch_dtype=torch_dtype, attn_implementation="sdpa")
+    return processor, model
+
+
+def pipeline_inference(clip_pipeline, image, labels):
+    """Perform inference using pipeline approach."""
+    return clip_pipeline(image, candidate_labels=labels)
+
+def automodel_inference(processor, model, image, labels):
+    """Perform inference using AutoModel approach."""
+    inputs = processor(text=labels, images=image, return_tensors="pt", padding=True)
+    with torch.no_grad():
+        outputs = model(**inputs)
+    return outputs.logits_per_image
+
+def setup_clip_class(model_name):
+    """Sets up the CLIPZeroShotClassifier."""
+    print(f"Loading {model_name} with CLIPZeroShotClassifier...")
+    classifier = CLIPZeroShotClassifier(model_name)
+    print(f"CLIPZeroShotClassifier loaded successfully!")
+    return classifier
+
+def clip_class_inference(classifier, image, labels):
+    """Perform inference using CLIPZeroShotClassifier approach."""
+    print("Running CLIPZeroShotClassifier inference...")
+    results = classifier.classify_image(image, labels)
+    return results
+
+def process_results(outputs, labels, method="pipeline"):
+    """Process inference results for all methods."""
+    if method == "pipeline":
+        # Pipeline returns results sorted by score, need to reorder to match input labels
+        scores = []
+        for label in labels:
+            for result in outputs:
+                if result['label'] == label:
+                    scores.append(result['score'])
+                    break
+            else:
+                scores.append(0.0)  # If label not found
+        top_label = outputs[0]['label']
+        top_score = outputs[0]['score']
+    else:  # AutoModel or CLIPZeroShotClassifier
+        probs = outputs['probabilities'] if method == "clip_class" else outputs.softmax(dim=1)[0].tolist()
+        scores = probs
+        top_label = labels[np.argmax(probs)]
+        top_score = max(probs)
+    return top_label, top_score, scores
+
 def main(args):
     """Main function to perform zero-shot image classification."""
     try:
@@ -138,8 +153,8 @@ def main(args):
             outputs = pipeline_inference(clip_pipeline, image, args.labels)
             top_label, top_score, scores = process_results(outputs, args.labels, method="pipeline")
         elif args.use_clip_class:
-            classifier = CLIPZeroShotClassifier(args.model)
-            results = classifier.classify_image(image, args.labels)
+            classifier = setup_clip_class(args.model)
+            results = clip_class_inference(classifier, image, args.labels)
             top_label, top_score, scores = process_results(results, args.labels, method="clip_class")
         else:
             processor, model = setup_automodel(args.model, torch_dtype)
