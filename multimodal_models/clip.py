@@ -35,23 +35,6 @@ class CLIPZeroShotClassifier:
             'predicted_probability': probabilities.max().item()
         }
 
-def parse_args():
-    """Parses command-line arguments."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="openai/clip-vit-base-patch32")
-    parser.add_argument("--image_url", type=str, default="http://images.cocodataset.org/val2017/000000039769.jpg")
-    parser.add_argument("--labels", type=str, nargs='+', default=["a photo of a cat", "a photo of a dog", "a photo of a car"])
-    parser.add_argument("--threshold", type=float, default=0.1)
-    parser.add_argument("--use_pipeline", action="store_true")
-    parser.add_argument("--use_clip_class", action="store_true")
-    parser.add_argument("--torch_dtype", type=str, choices=["float32", "float16", "bfloat16"], default="bfloat16")
-    parser.add_argument("--device", type=str, default="auto")
-    parser.add_argument("--visualize", action="store_true")
-    parser.add_argument("--output_image", type=str, default="clip_output_image.png")
-    parser.add_argument("--plot_results", action="store_true")
-    parser.add_argument("--save_plot", type=str, default="")
-    return parser.parse_args()
-
 def get_torch_dtype(dtype_str):
     """Convert string to torch dtype."""
     return {"float32": torch.float32, "float16": torch.float16, "bfloat16": torch.bfloat16}.get(dtype_str, torch.bfloat16)
@@ -173,6 +156,23 @@ def main(args):
         print(f"Error downloading image: {e}")
     except Exception as e:
         print(f"An error occurred: {e}")
+
+def parse_args():
+    """Parses command-line arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", type=str, default="openai/clip-vit-base-patch32")
+    parser.add_argument("--image_url", type=str, default="http://images.cocodataset.org/val2017/000000039769.jpg")
+    parser.add_argument("--labels", type=str, nargs='+', default=["a photo of a cat", "a photo of a dog", "a photo of a car"])
+    parser.add_argument("--threshold", type=float, default=0.1)
+    parser.add_argument("--use_pipeline", action="store_true")
+    parser.add_argument("--use_clip_class", action="store_true")
+    parser.add_argument("--torch_dtype", type=str, choices=["float32", "float16", "bfloat16"], default="bfloat16")
+    parser.add_argument("--device", type=str, default="auto")
+    parser.add_argument("--visualize", action="store_true")
+    parser.add_argument("--output_image", type=str, default="clip_output_image.png")
+    parser.add_argument("--plot_results", action="store_true")
+    parser.add_argument("--save_plot", type=str, default="")
+    return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
