@@ -41,20 +41,29 @@ class Qwen2_5_VLProcessor:
             max_pixels=max_pixels
         )
     
-    def create_message(self, image: Image.Image, prompt: str) -> List[Dict]:
+    def create_message(self, image: Union[Image.Image, List[Image.Image]], prompt: str) -> List[Dict]:
         """Create a message format for Qwen2.5-VL"""
+        content = []
+        
+        # Handle single image or list of images
+        if isinstance(image, list):
+            for img in image:
+                content.append({"type": "image", "image": img})
+        else:
+            content.append({"type": "image", "image": image})
+        
+        # Add text prompt
+        content.append({"type": "text", "text": prompt})
+        
         return [
             {
                 "role": "user",
-                "content": [
-                    {"type": "image", "image": image},
-                    {"type": "text", "text": prompt}
-                ]
+                "content": content
             }
         ]
     
-    def generate_response(self, image: Image.Image, prompt: str, max_new_tokens: int = 128) -> str:
-        """Generate text response for an image and prompt"""
+    def generate_response(self, image: Union[Image.Image, List[Image.Image]], prompt: str, max_new_tokens: int = 128) -> str:
+        """Generate text response for an image(s) and prompt"""
         messages = self.create_message(image, prompt)
         
         inputs = self.processor.apply_chat_template(
@@ -77,6 +86,20 @@ class Qwen2_5_VLProcessor:
         )
         
         return output_text[0] if output_text else ""
+    
+    def batch_process_images(self, image_lists: List[List[Image.Image]], prompts: List[str], 
+                           max_new_tokens: int = 128) -> List[str]:
+        """Process multiple sets of images with different prompts"""
+        if len(image_lists) != len(prompts):
+            raise ValueError("Number of image lists must match number of prompts")
+        
+        results = []
+        for i, (images, prompt) in enumerate(zip(image_lists, prompts)):
+            logger.info(f"Processing batch {i+1}/{len(image_lists)}")
+            result = self.generate_response(images, prompt, max_new_tokens)
+            results.append(result)
+        
+        return results
 
 
 def load_image(source: Union[str, Image.Image]) -> Image.Image:
@@ -89,6 +112,24 @@ def load_image(source: Union[str, Image.Image]) -> Image.Image:
         return Image.open(response.raw)
     else:
         return Image.open(source)
+
+
+def load_images(sources: Union[str, List[str], Image.Image, List[Image.Image]]) -> List[Image.Image]:
+    """Load multiple images from URLs, file paths, or PIL Images"""
+    if not isinstance(sources, list):
+        sources = [sources]
+    
+    images = []
+    for source in sources:
+        try:
+            image = load_image(source)
+            images.append(image)
+            logger.info(f"Loaded image from: {source if isinstance(source, str) else 'PIL Image'}")
+        except Exception as e:
+            logger.error(f"Failed to load image from {source}: {e}")
+            raise
+    
+    return images
 
 
 def get_torch_dtype(dtype_str: str) -> torch.dtype:
@@ -147,17 +188,24 @@ def setup_qwen_class(model_name: str, min_pixels: int, max_pixels: int):
     return processor_class
 
 
-def pipeline_inference(pipe, image: Image.Image, prompt: str, max_new_tokens: int) -> str:
+def pipeline_inference(pipe, image: Union[Image.Image, List[Image.Image]], prompt: str, max_new_tokens: int) -> str:
     """Run inference using pipeline"""
     logger.info("Running pipeline inference...")
+    
+    content = []
+    # Handle single image or list of images
+    if isinstance(image, list):
+        for img in image:
+            content.append({"type": "image", "image": img})
+    else:
+        content.append({"type": "image", "image": image})
+    
+    content.append({"type": "text", "text": prompt})
     
     messages = [
         {
             "role": "user",
-            "content": [
-                {"type": "image", "image": image},
-                {"type": "text", "text": prompt}
-            ]
+            "content": content
         }
     ]
     
@@ -167,17 +215,24 @@ def pipeline_inference(pipe, image: Image.Image, prompt: str, max_new_tokens: in
     return result[0]['generated_text'] if result else ""
 
 
-def automodel_inference(model, processor, image: Image.Image, prompt: str, max_new_tokens: int) -> str:
+def automodel_inference(model, processor, image: Union[Image.Image, List[Image.Image]], prompt: str, max_new_tokens: int) -> str:
     """Run inference using AutoModel"""
     logger.info("Running AutoModel inference...")
+    
+    content = []
+    # Handle single image or list of images
+    if isinstance(image, list):
+        for img in image:
+            content.append({"type": "image", "image": img})
+    else:
+        content.append({"type": "image", "image": image})
+    
+    content.append({"type": "text", "text": prompt})
     
     messages = [
         {
             "role": "user",
-            "content": [
-                {"type": "image", "image": image},
-                {"type": "text", "text": prompt}
-            ]
+            "content": content
         }
     ]
     
@@ -204,7 +259,7 @@ def automodel_inference(model, processor, image: Image.Image, prompt: str, max_n
     return output_text[0] if output_text else ""
 
 
-def qwen_class_inference(processor_class, image: Image.Image, prompt: str, max_new_tokens: int) -> str:
+def qwen_class_inference(processor_class, image: Union[Image.Image, List[Image.Image]], prompt: str, max_new_tokens: int) -> str:
     """Run inference using Qwen2_5_VLProcessor class"""
     logger.info("Running Qwen2_5_VLProcessor inference...")
     result = processor_class.generate_response(image, prompt, max_new_tokens)
@@ -212,22 +267,72 @@ def qwen_class_inference(processor_class, image: Image.Image, prompt: str, max_n
     return result
 
 
-def run_inference(args, image: Image.Image, prompt: str) -> str:
+def run_inference(args, images: Union[Image.Image, List[Image.Image]], prompt: str) -> str:
     """Run inference based on selected method"""
     torch_dtype = get_torch_dtype(args.torch_dtype)
     device = get_device(args.device)
     
     if args.use_pipeline:
         pipe = setup_pipeline(args.model, torch_dtype, device)
-        return pipeline_inference(pipe, image, prompt, args.max_new_tokens)
+        return pipeline_inference(pipe, images, prompt, args.max_new_tokens)
         
     elif args.use_qwen_class:
         processor_class = setup_qwen_class(args.model, args.min_pixels, args.max_pixels)
-        return qwen_class_inference(processor_class, image, prompt, args.max_new_tokens)
+        return qwen_class_inference(processor_class, images, prompt, args.max_new_tokens)
         
     else:  # AutoModel approach (default)
         model, processor = setup_automodel(args.model, torch_dtype, args.min_pixels, args.max_pixels)
-        return automodel_inference(model, processor, image, prompt, args.max_new_tokens)
+        return automodel_inference(model, processor, images, prompt, args.max_new_tokens)
+
+
+def save_images(images: List[Image.Image], output_dir: str, prefix: str = "image"):
+    """Save multiple images to directory"""
+    os.makedirs(output_dir, exist_ok=True)
+    saved_paths = []
+    
+    for i, image in enumerate(images):
+        output_path = os.path.join(output_dir, f"{prefix}_{i+1}.jpg")
+        image.save(output_path)
+        saved_paths.append(output_path)
+        logger.info(f"Image {i+1} saved to {output_path}")
+    
+    return saved_paths
+
+
+def visualize_images(images: List[Image.Image], title_prefix: str = "Image"):
+    """Display multiple images in a grid"""
+    num_images = len(images)
+    if num_images == 1:
+        plt.figure(figsize=(10, 8))
+        plt.imshow(images[0])
+        plt.axis('off')
+        plt.title(f"{title_prefix} 1")
+        plt.show()
+        return
+    
+    # Calculate grid dimensions
+    cols = min(3, num_images)
+    rows = (num_images + cols - 1) // cols
+    
+    fig, axes = plt.subplots(rows, cols, figsize=(5*cols, 5*rows))
+    if rows == 1 and cols == 1:
+        axes = [axes]
+    elif rows == 1 or cols == 1:
+        axes = axes.flatten()
+    else:
+        axes = axes.flatten()
+    
+    for i, image in enumerate(images):
+        axes[i].imshow(image)
+        axes[i].axis('off')
+        axes[i].set_title(f"{title_prefix} {i+1}")
+    
+    # Hide empty subplots
+    for i in range(num_images, len(axes)):
+        axes[i].set_visible(False)
+    
+    plt.tight_layout()
+    plt.show()
 
 
 def save_image(image: Image.Image, output_path: str):
@@ -258,6 +363,16 @@ def validate_args(args):
     methods = [args.use_pipeline, args.use_qwen_class]
     if sum(methods) > 1:
         raise ValueError("Only one inference method can be selected")
+    
+    # Check if multiple image arguments are provided
+    image_args = [args.image_url, args.image_urls, args.image_paths]
+    provided_args = [arg for arg in image_args if arg]
+    
+    if len(provided_args) > 1:
+        raise ValueError("Only one of --image_url, --image_urls, or --image_paths can be provided")
+    
+    if not provided_args:
+        raise ValueError("At least one image input must be provided")
 
 
 def cleanup():
@@ -272,7 +387,6 @@ def main(args):
         validate_args(args)
         
         print("Model selected:", args.model)
-        print("Image URL:", args.image_url)
         print("Prompt:", args.prompt)
         print("Max new tokens:", args.max_new_tokens)
         print("Min pixels:", args.min_pixels)
@@ -289,25 +403,37 @@ def main(args):
         print("Torch dtype:", args.torch_dtype)
         print("Device:", args.device)
         
-        # Load image
-        print("Downloading and opening image...")
-        image = load_image(args.image_url)
-        print("Image loaded successfully!")
+        # Load images
+        print("Loading image(s)...")
+        if args.image_urls:
+            print("Image URLs:", args.image_urls)
+            images = load_images(args.image_urls)
+        elif args.image_paths:
+            print("Image paths:", args.image_paths)
+            images = load_images(args.image_paths)
+        else:
+            print("Image URL:", args.image_url)
+            images = [load_image(args.image_url)]
         
-        # Display image if requested
+        print(f"Loaded {len(images)} image(s) successfully!")
+        
+        # Display images if requested
         if args.visualize:
-            plt.figure(figsize=(10, 8))
-            plt.imshow(image)
-            plt.axis('off')
-            plt.title("Input Image")
-            plt.show()
+            visualize_images(images, "Input Image")
         
-        # Save image if requested
+        # Save images if requested
         if args.output_image:
-            save_image(image, args.output_image)
+            if len(images) == 1:
+                save_image(images[0], args.output_image)
+            else:
+                # For multiple images, save to directory
+                output_dir = os.path.splitext(args.output_image)[0] + "_images"
+                save_images(images, output_dir)
         
         # Run inference
-        response = run_inference(args, image, args.prompt)
+        # For single image, pass the image directly; for multiple, pass the list
+        images_input = images[0] if len(images) == 1 else images
+        response = run_inference(args, images_input, args.prompt)
         
         # Display results
         display_results(args.prompt, response)
@@ -316,7 +442,9 @@ def main(args):
         if args.output_text:
             os.makedirs(os.path.dirname(args.output_text) or '.', exist_ok=True)
             with open(args.output_text, 'w', encoding='utf-8') as f:
-                f.write(f"Prompt: {args.prompt}\n\nResponse:\n{response}")
+                f.write(f"Prompt: {args.prompt}\n")
+                f.write(f"Number of images: {len(images)}\n")
+                f.write(f"\nResponse:\n{response}")
             logger.info(f"Response saved to {args.output_text}")
         
     except requests.exceptions.RequestException as e:
@@ -345,7 +473,13 @@ def parse_args():
     
     parser.add_argument("--image_url", type=str, 
                        default="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/pipeline-cat-chonk.jpeg",
-                       help="URL or path to image")
+                       help="URL or path to single image")
+    
+    parser.add_argument("--image_urls", type=str, nargs='+',
+                       help="Multiple URLs or paths to images")
+    
+    parser.add_argument("--image_paths", type=str, nargs='+',
+                       help="Multiple local paths to images")
     
     parser.add_argument("--prompt", type=str, 
                        default="Describe this image in detail.",
