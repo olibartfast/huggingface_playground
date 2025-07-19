@@ -1,3 +1,43 @@
+"""
+Qwen2.5-VL Vision-Language Model Inference
+
+This script provides three approaches for running Qwen2.5-VL models:
+1. Pipeline API - Simple and high-level interface
+2. AutoModel API - More control over model parameters
+3. Custom Class - Reusable processor with memory management
+
+MEMORY MANAGEMENT:
+- For limited GPU memory (< 8GB), use --force_cpu flag
+- For moderate GPU memory, use --low_memory flag for optimization
+- The script automatically handles CUDA out of memory errors with fallback strategies
+- Memory optimization includes cache clearing and reduced token generation
+
+USAGE EXAMPLES:
+# Basic usage
+python qwen2.5-vl.py
+
+# Force CPU usage for limited GPU memory
+python qwen2.5-vl.py --force_cpu
+
+# Use memory optimization
+python qwen2.5-vl.py --low_memory
+
+# Specify model size
+python qwen2.5-vl.py --model_name Qwen/Qwen2.5-VL-7B-Instruct
+
+REQUIREMENTS:
+- torch>=2.0.0
+- transformers>=4.47.0
+- Pillow
+- requests
+- accelerate (optional, for device_map="auto")
+
+Model sizes and memory requirements:
+- Qwen2.5-VL-3B: ~6GB GPU memory
+- Qwen2.5-VL-7B: ~14GB GPU memory  
+- Qwen2.5-VL-72B: ~144GB GPU memory
+"""
+
 import requests
 from PIL import Image
 import torch
@@ -29,12 +69,58 @@ class Qwen2_5_VLProcessor:
     def __init__(self, model_name: str = "Qwen/Qwen2.5-VL-3B-Instruct", 
                  min_pixels: int = 224*224, max_pixels: int = 1024*1024):
         self.model_name = model_name
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            model_name,
-            torch_dtype=torch.bfloat16,
-            device_map="auto",
-            attn_implementation="sdpa"
-        )
+        
+        # Try different loading strategies based on available memory
+        try:
+            # Strategy 1: Try with device_map="auto" and accelerate
+            self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                model_name,
+                torch_dtype=torch.bfloat16,
+                device_map="auto",
+                attn_implementation="sdpa"
+            )
+            logger.info("Model loaded with device_map='auto'")
+        except ValueError as e:
+            if "accelerate" in str(e):
+                logger.warning("accelerate not available, trying alternative loading strategies...")
+                try:
+                    # Strategy 2: Try loading with CPU offloading
+                    self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                        model_name,
+                        torch_dtype=torch.bfloat16,
+                        low_cpu_mem_usage=True,
+                        attn_implementation="sdpa"
+                    )
+                    # Move to GPU if there's enough memory
+                    if torch.cuda.is_available():
+                        try:
+                            self.model = self.model.to("cuda")
+                            logger.info("Model loaded to GPU")
+                        except torch.cuda.OutOfMemoryError:
+                            logger.warning("Not enough GPU memory, keeping model on CPU")
+                            self.model = self.model.to("cpu")
+                except torch.cuda.OutOfMemoryError:
+                    logger.warning("GPU out of memory, loading model on CPU")
+                    # Strategy 3: Load entirely on CPU
+                    self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                        model_name,
+                        torch_dtype=torch.float32,  # Use float32 on CPU for compatibility
+                        low_cpu_mem_usage=True,
+                        attn_implementation="sdpa"
+                    ).to("cpu")
+            else:
+                raise e
+        except torch.cuda.OutOfMemoryError:
+            logger.warning("GPU out of memory during loading, trying CPU...")
+            # Strategy 3: Load on CPU due to memory constraints
+            self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                model_name,
+                torch_dtype=torch.float32,  # Use float32 on CPU for compatibility
+                low_cpu_mem_usage=True,
+                attn_implementation="sdpa"
+            ).to("cpu")
+            logger.info("Model loaded on CPU due to GPU memory constraints")
+                
         self.processor = AutoProcessor.from_pretrained(
             model_name,
             min_pixels=min_pixels,
@@ -74,8 +160,19 @@ class Qwen2_5_VLProcessor:
             return_tensors="pt"
         ).to(self.model.device)
         
+        # Clear cache before inference
+        if torch.cuda.is_available() and self.model.device.type == "cuda":
+            torch.cuda.empty_cache()
+        
         with torch.no_grad():
-            generated_ids = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
+            try:
+                generated_ids = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
+            except torch.cuda.OutOfMemoryError:
+                logger.warning("GPU out of memory during inference, clearing cache and retrying...")
+                torch.cuda.empty_cache()
+                # Try with lower max_new_tokens
+                max_new_tokens = min(max_new_tokens, 64)
+                generated_ids = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
         
         generated_ids_trimmed = [
             out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
@@ -84,6 +181,10 @@ class Qwen2_5_VLProcessor:
         output_text = self.processor.batch_decode(
             generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )
+        
+        # Clear cache after inference
+        if torch.cuda.is_available() and self.model.device.type == "cuda":
+            torch.cuda.empty_cache()
         
         return output_text[0] if output_text else ""
     
@@ -165,12 +266,58 @@ def setup_pipeline(model_name: str, torch_dtype: torch.dtype, device: Union[int,
 def setup_automodel(model_name: str, torch_dtype: torch.dtype, min_pixels: int, max_pixels: int):
     """Setup AutoModel and processor for image-text-to-text generation"""
     logger.info(f"Loading {model_name} with AutoModel...")
-    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-        model_name,
-        torch_dtype=torch_dtype,
-        device_map="auto",
-        attn_implementation="sdpa"
-    )
+    
+    # Try different loading strategies based on available memory
+    try:
+        # Strategy 1: Try with device_map="auto" and accelerate
+        model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+            model_name,
+            torch_dtype=torch_dtype,
+            device_map="auto",
+            attn_implementation="sdpa"
+        )
+        logger.info("Model loaded with device_map='auto'")
+    except ValueError as e:
+        if "accelerate" in str(e):
+            logger.warning("accelerate not available, trying alternative loading strategies...")
+            try:
+                # Strategy 2: Try loading with CPU offloading
+                model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                    model_name,
+                    torch_dtype=torch_dtype,
+                    low_cpu_mem_usage=True,
+                    attn_implementation="sdpa"
+                )
+                # Move to GPU if there's enough memory
+                if torch.cuda.is_available():
+                    try:
+                        model = model.to("cuda")
+                        logger.info("Model loaded to GPU")
+                    except torch.cuda.OutOfMemoryError:
+                        logger.warning("Not enough GPU memory, keeping model on CPU")
+                        model = model.to("cpu")
+            except torch.cuda.OutOfMemoryError:
+                logger.warning("GPU out of memory, loading model on CPU")
+                # Strategy 3: Load entirely on CPU
+                model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                    model_name,
+                    torch_dtype=torch.float32,  # Use float32 on CPU for compatibility
+                    low_cpu_mem_usage=True,
+                    attn_implementation="sdpa"
+                ).to("cpu")
+        else:
+            raise e
+    except torch.cuda.OutOfMemoryError:
+        logger.warning("GPU out of memory during loading, trying CPU...")
+        # Strategy 3: Load on CPU due to memory constraints
+        model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+            model_name,
+            torch_dtype=torch.float32,  # Use float32 on CPU for compatibility
+            low_cpu_mem_usage=True,
+            attn_implementation="sdpa"
+        ).to("cpu")
+        logger.info("Model loaded on CPU due to GPU memory constraints")
+    
     processor = AutoProcessor.from_pretrained(
         model_name,
         min_pixels=min_pixels,
@@ -209,7 +356,23 @@ def pipeline_inference(pipe, image: Union[Image.Image, List[Image.Image]], promp
         }
     ]
     
-    result = pipe(messages, max_new_tokens=max_new_tokens, return_full_text=False)
+    # Clear cache before inference
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
+    try:
+        result = pipe(messages, max_new_tokens=max_new_tokens, return_full_text=False)
+    except torch.cuda.OutOfMemoryError:
+        logger.warning("GPU out of memory during pipeline inference, clearing cache and retrying...")
+        torch.cuda.empty_cache()
+        # Try with lower max_new_tokens
+        max_new_tokens = min(max_new_tokens, 64)
+        result = pipe(messages, max_new_tokens=max_new_tokens, return_full_text=False)
+    
+    # Clear cache after inference
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
     logger.info("Pipeline inference completed!")
     
     return result[0]['generated_text'] if result else ""
@@ -244,8 +407,19 @@ def automodel_inference(model, processor, image: Union[Image.Image, List[Image.I
         return_tensors="pt"
     ).to(model.device)
     
+    # Clear cache before inference
+    if torch.cuda.is_available() and model.device.type == "cuda":
+        torch.cuda.empty_cache()
+    
     with torch.no_grad():
-        generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+        try:
+            generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+        except torch.cuda.OutOfMemoryError:
+            logger.warning("GPU out of memory during inference, clearing cache and retrying...")
+            torch.cuda.empty_cache()
+            # Try with lower max_new_tokens
+            max_new_tokens = min(max_new_tokens, 64)
+            generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
     
     generated_ids_trimmed = [
         out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
@@ -254,6 +428,10 @@ def automodel_inference(model, processor, image: Union[Image.Image, List[Image.I
     output_text = processor.batch_decode(
         generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
     )
+    
+    # Clear cache after inference
+    if torch.cuda.is_available() and model.device.type == "cuda":
+        torch.cuda.empty_cache()
     
     logger.info("AutoModel inference completed!")
     return output_text[0] if output_text else ""
@@ -271,6 +449,12 @@ def run_inference(args, images: Union[Image.Image, List[Image.Image]], prompt: s
     """Run inference based on selected method"""
     torch_dtype = get_torch_dtype(args.torch_dtype)
     device = get_device(args.device)
+    
+    # Override device if force_cpu is set
+    if args.force_cpu:
+        device = "cpu"
+        torch_dtype = torch.float32  # Use float32 for CPU
+        logger.info("Forcing CPU usage due to --force_cpu flag")
     
     if args.use_pipeline:
         pipe = setup_pipeline(args.model, torch_dtype, device)
@@ -381,10 +565,61 @@ def cleanup():
         torch.cuda.empty_cache()
 
 
+def check_accelerate():
+    """Check if accelerate is available and provide installation instructions if not"""
+    try:
+        import accelerate
+        return True
+    except ImportError:
+        logger.warning("accelerate package not found. For optimal performance, install it with: pip install accelerate")
+        return False
+
+
+def setup_memory_optimizations():
+    """Setup memory optimizations for CUDA"""
+    if torch.cuda.is_available():
+        # Set CUDA memory allocation configuration for better memory management
+        os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+        
+        # Clear GPU cache
+        torch.cuda.empty_cache()
+        
+        # Get GPU memory info
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
+        gpu_free = torch.cuda.memory_reserved(0) / 1024**3  # GB
+        
+        logger.info(f"GPU Memory: {gpu_memory:.2f} GB total")
+        logger.info(f"GPU Memory Reserved: {gpu_free:.2f} GB")
+        
+        return gpu_memory, gpu_free
+    return 0, 0
+
+
+def get_memory_efficient_dtype(device: str) -> torch.dtype:
+    """Get appropriate dtype based on device and memory constraints"""
+    if device == "cpu":
+        return torch.float32  # CPU works better with float32
+    else:
+        return torch.bfloat16  # GPU can use bfloat16 for memory efficiency
+
+
 def main(args):
     """Main function to perform vision-language inference"""
     try:
         validate_args(args)
+        
+        # Setup memory optimizations
+        gpu_memory, gpu_free = setup_memory_optimizations()
+        
+        # Check for accelerate
+        has_accelerate = check_accelerate()
+        if not has_accelerate:
+            logger.info("Running without accelerate - model loading may be slower")
+        
+        # Suggest smaller model if GPU memory is very limited
+        if gpu_memory > 0 and gpu_memory < 8:  # Less than 8GB GPU
+            if "7B" in args.model or "72B" in args.model:
+                logger.warning(f"Your GPU has {gpu_memory:.1f}GB memory. Consider using Qwen/Qwen2.5-VL-3B-Instruct for better performance")
         
         print("Model selected:", args.model)
         print("Prompt:", args.prompt)
@@ -507,6 +742,12 @@ def parse_args():
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto, cpu, cuda)")
     
+    parser.add_argument("--force_cpu", action="store_true",
+                       help="Force model to run on CPU (useful for memory constraints)")
+    
+    parser.add_argument("--low_memory", action="store_true",
+                       help="Enable low memory usage optimizations")
+    
     parser.add_argument("--visualize", action="store_true",
                        help="Display the input image")
     
@@ -522,3 +763,14 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     main(args)
+
+# MEMORY USAGE EXAMPLES:
+# 
+# For systems with limited GPU memory (< 8GB):
+# python qwen2.5-vl.py --force_cpu --image_url "https://example.com/image.jpg" --prompt "What do you see?"
+#
+# For systems with moderate GPU memory (8-16GB):
+# python qwen2.5-vl.py --low_memory --model_name "Qwen/Qwen2.5-VL-3B-Instruct"
+#
+# For high-end systems (16GB+ GPU memory):
+# python qwen2.5-vl.py --model_name "Qwen/Qwen2.5-VL-7B-Instruct"
