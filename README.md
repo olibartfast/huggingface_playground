@@ -144,6 +144,7 @@ C++ and Python implementations for Hugging Face models, focusing on computer vis
 - [PyTorch Tutorials](https://github.com/philschmid/deep-learning-pytorch-huggingface): Deep learning with PyTorch and Hugging Face.
 - [NVIDIA Triton Server](https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace): Deploying models with Triton.
 - [Transformers Notebooks](https://github.com/qubvel/transformers-notebooks/tree/main/notebooks): Example notebooks for Transformers.
+- [Transformers Server](https://huggingface.co/docs/transformers/main/serving): Serve a transformer model. 
 
 ## Courses
 - [DeepLearning.AI: Open Source Models with Hugging Face](https://www.deeplearning.ai/short-courses/open-source-models-hugging-face/)
