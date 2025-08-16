@@ -1,0 +1,10 @@
+torch>=2.0.0
+transformers>=4.37.0
+pillow>=9.0.0
+matplotlib>=3.5.0
+numpy>=1.21.0
+requests>=2.25.0
+scipy>=1.7.0
+opencv-python>=4.5.0
+huggingface-hub>=0.16.0
+torchao  # optional for quantization
