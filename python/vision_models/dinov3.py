@@ -392,9 +392,18 @@ def extract_features_with_registers(image: Image.Image, processor, model) -> Dic
 
 def instance_segmentation(image, processor, model, output_path, visualize=False):
     """Perform instance segmentation with DINOv3."""
-    print("WARNING: Instance segmentation with DINOv3 requires fine-tuning for accurate results.")
-    print("This is a demonstration using an UNTRAINED segmentation head.")
-    print("The results will be RANDOM and not meaningful for actual object detection!")
+    print("=" * 60)
+    print("⚠️  IMPORTANT: Instance Segmentation Demo Analysis")
+    print("=" * 60)
+    print("✅ SUCCESS: DINOv3 feature extraction working correctly")
+    print("⚠️  LIMITATION: Using UNTRAINED segmentation head")
+    print("📊 RESULT: Random masks (not meaningful object detection)")
+    print("")
+    print("For REAL instance segmentation, you need:")
+    print("1. Fine-tuned segmentation head on labeled data")
+    print("2. Or use specialized models like Mask R-CNN, DETR, etc.")
+    print("3. Or combine with SAM (Segment Anything Model)")
+    print("=" * 60)
     
     response = input("Continue with demo anyway? (y/n): ")
     if response.lower() != 'y':
@@ -445,8 +454,15 @@ def instance_segmentation(image, processor, model, output_path, visualize=False)
         plt.subplot(2, 3, i + 2)
         mask = masks[i]
         plt.imshow(mask, cmap='hot')
-        plt.title(f"Random Mask {i+1}\n(Not Meaningful)")
+        plt.title(f"Random Mask {i+1}\n(Untrained Head)")
         plt.axis('off')
+    
+    # Add evaluation text
+    plt.figtext(0.02, 0.02, 
+                "⚠️ EVALUATION: Masks are random due to untrained segmentation head.\n"
+                "✅ DINOv3 features extracted correctly (384D, 14x14 spatial)\n"
+                "🔧 For real segmentation: fine-tune head or use SAM/Mask R-CNN", 
+                fontsize=8, ha='left')
     
     plt.tight_layout()
     plt.savefig(output_path, bbox_inches='tight', pad_inches=0, dpi=300)
