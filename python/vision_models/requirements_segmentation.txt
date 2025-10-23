@@ -1,0 +1,36 @@
+# Requirements for Real Instance Segmentation Scripts
+
+# Core dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+transformers>=4.35.0
+pillow>=9.0.0
+numpy>=1.21.0
+matplotlib>=3.5.0
+opencv-python>=4.6.0
+scipy>=1.8.0
+scikit-learn>=1.1.0
+requests>=2.28.0
+
+# For fine-tuned segmentation (COCO dataset)
+pycocotools>=2.0.6
+
+# For SAM integration (optional - install one of these)
+# Option 1: Segment Anything (original repository)
+# git+https://github.com/facebookresearch/segment-anything.git
+
+# Option 2: Use transformers version (recommended)
+# transformers>=4.32.0  # Already included above
+
+# Additional utilities
+tqdm>=4.64.0
+wandb>=0.13.0  # For training monitoring (optional)
+
+# For advanced visualizations
+seaborn>=0.11.0
+plotly>=5.10.0  # Optional for interactive plots
+
+# Development and testing
+pytest>=7.0.0
+black>=22.0.0
+flake8>=5.0.0

@@ -1,5 +1,12 @@
-# https://huggingface.co/docs/transformers/model_doc/dinov3
+# DINOv3 🦖🦖🦖 - Enhanced Vision Foundation Model
+# Official documentation: https://huggingface.co/docs/transformers/model_doc/dinov3
+# Paper: https://arxiv.org/abs/2508.10104
+# Collection: https://huggingface.co/collections/facebook/dinov3-68924841bd6b561778e31009
+# 
+# Requirements:
+# pip install --upgrade transformers>=4.35.0 torch torchvision pillow matplotlib numpy opencv-python
 # pip install --upgrade git+https://github.com/huggingface/transformers.git}
+
 import requests
 from PIL import Image
 import torch
@@ -16,9 +23,9 @@ try:
     TORCHVISION_AVAILABLE = True
 except ImportError:
     TORCHVISION_AVAILABLE = False
-    print("Warning: torchvision not available. Custom processor will not work.")
+    print("Warning: torchvision not available. Install with: pip install torchvision")
 
-# Updated imports based on official documentation
+# Enhanced imports based on official documentation
 from transformers import (
     AutoImageProcessor, 
     AutoModel, 
@@ -26,26 +33,66 @@ from transformers import (
     DINOv3ViTImageProcessorFast
 )
 from transformers.image_utils import load_image
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any, Union
 import gc
 
-def create_custom_dinov3_processor():
+# All available DINOv3 models from Hugging Face Hub
+DINOV3_MODELS = {
+    # ViT models pretrained on web dataset (LVD-1689M)
+    "vits16": "facebook/dinov3-vits16-pretrain-lvd1689m",
+    "vits16plus": "facebook/dinov3-vits16plus-pretrain-lvd1689m", 
+    "vitb16": "facebook/dinov3-vitb16-pretrain-lvd1689m",
+    "vitl16": "facebook/dinov3-vitl16-pretrain-lvd1689m",
+    "vith16plus": "facebook/dinov3-vith16plus-pretrain-lvd1689m",
+    "vit7b16": "facebook/dinov3-vit7b16-pretrain-lvd1689m",
+    
+    # ConvNeXt models pretrained on web dataset (LVD-1689M)
+    "convnext_tiny": "facebook/dinov3-convnext-tiny-pretrain-lvd1689m",
+    "convnext_small": "facebook/dinov3-convnext-small-pretrain-lvd1689m",
+    "convnext_base": "facebook/dinov3-convnext-base-pretrain-lvd1689m",
+    "convnext_large": "facebook/dinov3-convnext-large-pretrain-lvd1689m",
+    
+    # ViT models pretrained on satellite dataset (SAT-493M)
+    "vitl16_sat": "facebook/dinov3-vitl16-pretrain-sat493m",
+    "vit7b16_sat": "facebook/dinov3-vit7b16-pretrain-sat493m",
+}
+
+def make_transform_lvd(resize_size: int = 224):
+    """Transform for models using LVD-1689M weights (web images)."""
+    if not TORCHVISION_AVAILABLE:
+        return None
+    return transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Resize((resize_size, resize_size), antialias=True),
+        transforms.Normalize(
+            mean=(0.485, 0.456, 0.406),  # Standard ImageNet
+            std=(0.229, 0.224, 0.225),
+        )
+    ])
+
+def make_transform_sat(resize_size: int = 224):
+    """Transform for models using SAT-493M weights (satellite imagery)."""
+    if not TORCHVISION_AVAILABLE:
+        return None
+    return transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Resize((resize_size, resize_size), antialias=True),
+        transforms.Normalize(
+            mean=(0.430, 0.411, 0.296),  # Satellite imagery specific
+            std=(0.213, 0.156, 0.143),
+        )
+    ])
+
+def create_custom_dinov3_processor(model_type="lvd"):
     """Create a custom processor for DINOv3 using torchvision transforms."""
     if not TORCHVISION_AVAILABLE:
         print("✗ torchvision not available for custom processor")
+        print("Install with: pip install torchvision")
         return None
         
     class CustomDINOv3Processor:
-        def __init__(self):
-            # DINOv3 typically uses similar preprocessing to DINOv2
-            self.transform = transforms.Compose([
-                transforms.Resize((224, 224)),  # Standard ViT input size
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406],  # ImageNet mean
-                    std=[0.229, 0.224, 0.225]    # ImageNet std
-                )
-            ])
+        def __init__(self, transform):
+            self.transform = transform
         
         def __call__(self, images, return_tensors="pt"):
             if not isinstance(images, list):
@@ -65,75 +112,94 @@ def create_custom_dinov3_processor():
             else:
                 return {"pixel_values": pixel_values.numpy()}
     
-    return CustomDINOv3Processor()
+    # Choose appropriate transform based on model type
+    if model_type == "sat":
+        transform = make_transform_sat()
+    else:
+        transform = make_transform_lvd()
+    
+    if transform is None:
+        return None
+        
+    return CustomDINOv3Processor(transform)
 
 def get_device(model) -> torch.device:
     """Get the device of the model."""
     return next(model.parameters()).device
 
-def validate_model_exists(model_name: str) -> bool:
-    """Check if model exists on HuggingFace."""
+def validate_model_exists(model_id: str) -> bool:
+    """Check if model exists on HuggingFace Hub."""
     try:
         from huggingface_hub import model_info
-        model_info(f"facebook/{model_name}")
+        model_info(model_id)
         return True
     except Exception as e:
-        # Don't fail completely, just warn
         print(f"Warning: Could not validate model existence: {e}")
         return True  # Assume it exists and let the actual loading handle the error
 
+def get_model_info(model_key: str) -> Dict[str, Any]:
+    """Get model information including ID, type, and dataset."""
+    if model_key not in DINOV3_MODELS:
+        available_models = ", ".join(DINOV3_MODELS.keys())
+        raise ValueError(f"Unknown model '{model_key}'. Available: {available_models}")
+    
+    model_id = DINOV3_MODELS[model_key]
+    is_satellite = "sat" in model_key
+    is_convnext = "convnext" in model_key
+    
+    return {
+        "model_id": model_id,
+        "model_key": model_key,
+        "is_satellite": is_satellite,
+        "is_convnext": is_convnext,
+        "dataset": "SAT-493M" if is_satellite else "LVD-1689M",
+        "architecture": "ConvNeXt" if is_convnext else "ViT"
+    }
+
 def parse_args():
     """Parses command-line arguments."""
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="DINOv3 Vision Foundation Model")
     parser.add_argument(
         "--task",
         type=str,
         choices=[
             "feature_extraction",
             "instance_segmentation",
+            "pca_visualization",
+            "dense_matching"
         ],
         default="feature_extraction",
-        help="Task to perform with DINOv3 (more tasks coming soon)"
+        help="Task to perform with DINOv3"
     )
     parser.add_argument(
         "--model",
         type=str,
-        choices=[
-            "dinov3-vits16-pretrain-lvd1689m",
-            "dinov3-vitb16-pretrain-lvd1689m", 
-            "dinov3-vitl16-pretrain-lvd1689m",
-        ],
-        default="dinov3-vits16-pretrain-lvd1689m",
-        help="DINOv3 model to use (requires access approval from Meta/Facebook)"
+        choices=list(DINOV3_MODELS.keys()),
+        default="vits16",
+        help=f"DINOv3 model variant to use. Available: {', '.join(DINOV3_MODELS.keys())}"
     )
     parser.add_argument(
         "--image_url",
         type=str,
         default="http://images.cocodataset.org/val2017/000000039769.jpg",
-        help="URL of the first image to process (for image-based tasks)"
+        help="URL of the image to process"
     )
     parser.add_argument(
         "--second_image_url",
         type=str,
         default=None,
-        help="URL of the second image (for sparse_matching, dense_matching, instance_retrieval)"
-    )
-    parser.add_argument(
-        "--video_path",
-        type=str,
-        default=None,
-        help="Path to the video file (for video_classification)"
+        help="URL of the second image (for dense matching)"
     )
     parser.add_argument(
         "--output_image",
         type=str,
         default="dinov3_output.png",
-        help="File path to save the output image"
+        help="File path to save the output visualization"
     )
     parser.add_argument(
         "--visualize",
         action="store_true",
-        help="Enable visualization (display output image or feature map)"
+        help="Enable visualization (display output)"
     )
     parser.add_argument(
         "--use_quantization",
@@ -151,136 +217,99 @@ def parse_args():
         default=None,
         help="Path to local image file (alternative to image_url)"
     )
+    parser.add_argument(
+        "--patch_size",
+        type=int,
+        default=224,
+        help="Input image size (will be resized to patch_size x patch_size)"
+    )
     args = parser.parse_args()
     return args
 
-def setup_model(model_name, task, use_quantization=False):
-    """Sets up the processor and model based on the model name and task."""
-    model_id = f"facebook/{model_name}"
-    print(f"Loading {model_name} model for {task}...")
-    
-    # First try the pipeline approach (recommended by documentation)
-    if task == "feature_extraction":
-        try:
-            print("Trying pipeline approach (recommended)...")
-            pipe = pipeline(
-                task="image-feature-extraction",
-                model=model_id,
-                torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
-                device=0 if torch.cuda.is_available() else -1
-            )
-            print("✓ Pipeline loaded successfully!")
-            return pipe, None  # Return pipeline instead of processor/model
-        except Exception as e:
-            print(f"Pipeline approach failed: {e}")
-            print("Falling back to manual model loading...")
-    
-    # Validate model exists
-    if not validate_model_exists(model_name):
-        print(f"Warning: Model '{model_id}' may not exist or is not accessible.")
-        print("Proceeding anyway, but this might fail...")
-    
-    # Try to load processor - now with multiple fallback strategies
-    processor = None
+def setup_model(args):
+    """Set up the DINOv3 model and processor."""
     try:
-        print(f"Attempting to load processor from: {model_id}")
-        # Try the fast processor first (from documentation)
-        try:
-            processor = DINOv3ViTImageProcessorFast.from_pretrained(model_id)
-            print(f"✓ Fast processor loaded successfully! Type: {type(processor)}")
-        except:
-            # Fallback to regular AutoImageProcessor
-            processor = AutoImageProcessor.from_pretrained(model_id)
-            print(f"✓ Processor loaded successfully! Type: {type(processor)}")
-    except Exception as e:
-        error_msg = str(e)
-        print(f"✗ Error loading processor: {e}")
+        if args.debug:
+            logger.info(f"Loading model: {args.model}")
         
-        # Check for different error types
-        if "gated repo" in error_msg or "restricted" in error_msg or "authorized list" in error_msg:
-            print("\n🔒 ACCESS REQUIRED: This is a gated repository!")
-            print("DINOv3 models require explicit access approval from Meta/Facebook.")
-            print("\nTo get access:")
-            print("1. Visit: https://huggingface.co/facebook/dinov3-vits16-pretrain-lvd1689m")
-            print("2. Click 'Request access' and fill out the form")
-            print("3. Wait for approval (usually takes a few hours to days)")
-            print("4. Make sure you're logged in: huggingface-cli login")
-            return None, None
-        elif "Unrecognized image processor" in error_msg or "image_processor_type" in error_msg:
-            print("⚠️ DINOv3 processor not recognized. Trying DINOv2 processor as fallback...")
+        # Get model information
+        model_info = get_model_info(args.model)
+        model_id = model_info["model_id"]
+        
+        # Set device
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        # Load processor with appropriate transforms
+        if model_info["dataset"] == "SAT-493M":
+            transform = make_transform_sat()
+        else:  # LVD-1689M
+            transform = make_transform_lvd()
+        processor = create_custom_dinov3_processor(transform)
+        
+        # First try the pipeline approach for feature extraction
+        if args.task == "feature_extraction":
             try:
-                # Use DINOv2 processor as fallback (compatible with DINOv3)
-                fallback_processor_id = "facebook/dinov2-base"
-                processor = AutoImageProcessor.from_pretrained(fallback_processor_id)
-                print(f"✓ Using DINOv2 processor as fallback: {type(processor)}")
-            except Exception as fallback_error:
-                print(f"✗ Fallback processor also failed: {fallback_error}")
-                print("Creating custom processor...")
-                processor = create_custom_dinov3_processor()
-                if processor is None:
-                    return None, None
-                print("✓ Custom processor created successfully!")
-        else:
-            print("This usually means the model doesn't exist or you don't have access.")
-            print("Available DINOv3 models (all require access):")
-            print("  - dinov3-vits16-pretrain-lvd1689m")
-            print("  - dinov3-vitb16-pretrain-lvd1689m")
-            print("  - dinov3-vitl16-pretrain-lvd1689m")
-            return None, None
-    
-    # Set up model with optional quantization (following documentation)
-    model_kwargs = {
-        "torch_dtype": torch.bfloat16 if torch.cuda.is_available() else torch.float32,
-        "device_map": "auto" if torch.cuda.is_available() else None,
-    }
-    
-    if use_quantization and torch.cuda.is_available():
-        try:
-            from transformers import TorchAoConfig
-            from torchao.quantization import Int4WeightOnlyConfig
-            # Following the documentation example
-            quant_type = Int4WeightOnlyConfig(group_size=128)
-            quantization_config = TorchAoConfig(quant_type=quant_type)
-            model_kwargs["quantization_config"] = quantization_config
-            print("Using Int4 quantization (following documentation)")
-        except ImportError:
-            print("TorchAO not available, proceeding without quantization")
-    
-    try:
-        print(f"Attempting to load model from: {model_id}")
-        model = AutoModel.from_pretrained(model_id, **model_kwargs)
-        print("✓ Model loaded successfully!")
-    except torch.cuda.OutOfMemoryError:
-        print("✗ CUDA out of memory. Try using --use_quantization flag or a smaller model.")
-        return None, None
-    except OSError as e:
-        error_msg = str(e)
-        print(f"✗ OSError loading model: {e}")
-        if "gated repo" in error_msg or "restricted" in error_msg or "authorized list" in error_msg:
-            print("\n🔒 ACCESS REQUIRED: This is a gated repository!")
-            print("You need access to both the processor AND the model.")
-            print("Make sure you're logged in: huggingface-cli login")
-        else:
-            print("This usually means the model doesn't exist or you don't have access.")
-        return None, None
+                if args.debug:
+                    logger.info("Trying pipeline approach (recommended)...")
+                pipe = pipeline(
+                    task="image-feature-extraction",
+                    model=model_id,
+                    torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+                    device=0 if torch.cuda.is_available() else -1
+                )
+                if args.debug:
+                    logger.info("✓ Pipeline loaded successfully!")
+                return pipe, processor, device  # Return pipeline with processor for consistency
+            except Exception as e:
+                if args.debug:
+                    logger.warning(f"Pipeline approach failed: {e}")
+                    logger.info("Falling back to manual model loading...")
+        
+        # Manual model loading with quantization support
+        model_kwargs = {
+            "torch_dtype": torch.bfloat16 if torch.cuda.is_available() else torch.float32,
+            "device_map": "auto" if torch.cuda.is_available() else None,
+        }
+        
+        if args.use_quantization and torch.cuda.is_available():
+            try:
+                from transformers import TorchAoConfig
+                from torchao.quantization import Int4WeightOnlyConfig
+                # Following the documentation example
+                quant_type = Int4WeightOnlyConfig(group_size=128)
+                quantization_config = TorchAoConfig(quant_type=quant_type)
+                model_kwargs["quantization_config"] = quantization_config
+                if args.debug:
+                    logger.info("Using Int4 quantization (following documentation)")
+            except ImportError:
+                if args.debug:
+                    logger.warning("TorchAO not available, proceeding without quantization")
+        
+        # Load model
+        if args.debug:
+            logger.info(f"Loading model from: {model_id}")
+        model = Dinov3Model.from_pretrained(model_id, **model_kwargs)
+        
+        if not args.use_quantization and device == "cuda":
+            model = model.to(device)
+        
+        model.eval()
+        
+        if args.debug:
+            logger.info(f"Model loaded successfully on device: {device}")
+            logger.info(f"Model info: {model_info}")
+            logger.info(f"Model config - Hidden size: {model.config.hidden_size}, Patch size: {model.config.patch_size}")
+            if hasattr(model.config, 'num_register_tokens'):
+                logger.info(f"Register tokens: {model.config.num_register_tokens}")
+        
+        return model, processor, device
+        
     except Exception as e:
-        print(f"✗ Unexpected error loading model: {e}")
-        return None, None
-    
-    if torch.cuda.is_available() and not use_quantization:
-        try:
-            model = model.to("cuda")
-            print("✓ Model moved to CUDA")
-        except torch.cuda.OutOfMemoryError:
-            print("✗ CUDA out of memory when moving model. Try --use_quantization flag.")
-            return None, None
-    
-    print(f"✓ {model_name} setup completed!")
-    print(f"Model config - Hidden size: {model.config.hidden_size}, Patch size: {model.config.patch_size}")
-    if hasattr(model.config, 'num_register_tokens'):
-        print(f"Register tokens: {model.config.num_register_tokens}")
-    
-    return processor, model
+        logger.error(f"Error setting up model: {e}")
+        if args.debug:
+            import traceback
+            traceback.print_exc()
+        raise RuntimeError(f"Failed to load model {args.model}: {e}")
 
 class InstanceSegmentationHead(nn.Module):
     """Enhanced instance segmentation head for DINOv3."""
@@ -608,11 +637,155 @@ def load_image_from_source(image_url=None, local_image=None):
     else:
         raise ValueError("Either image_url or local_image must be provided")
 
+def pca_visualization(image, processor, model, output_path, visualize=False):
+    """Create PCA visualization of DINOv3 features."""
+    print("Creating PCA visualization of DINOv3 features...")
+    
+    features = extract_features_with_registers(image, processor, model)
+    patch_features = features['patch_features_flat']  # [1, num_patches, hidden_size]
+    
+    # Convert to numpy for PCA
+    patch_features_np = patch_features.cpu().numpy().squeeze(0)  # [num_patches, hidden_size]
+    
+    # Apply PCA to reduce to 3 components for RGB visualization
+    from sklearn.decomposition import PCA
+    pca = PCA(n_components=3)
+    pca_features = pca.fit_transform(patch_features_np)  # [num_patches, 3]
+    
+    # Normalize to [0, 1] for RGB
+    pca_features = (pca_features - pca_features.min()) / (pca_features.max() - pca_features.min())
+    
+    # Reshape to spatial dimensions
+    spatial_dims = features['spatial_dims']
+    pca_image = pca_features.reshape(spatial_dims[0], spatial_dims[1], 3)
+    
+    # Convert to PIL Image
+    pca_image_pil = Image.fromarray((pca_image * 255).astype(np.uint8))
+    pca_image_pil = pca_image_pil.resize(image.size, Image.LANCZOS)
+    
+    # Create visualization
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+    
+    ax1.imshow(image)
+    ax1.set_title("Original Image")
+    ax1.axis('off')
+    
+    ax2.imshow(pca_image_pil)
+    ax2.set_title("PCA Features (RGB)")
+    ax2.axis('off')
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    
+    if visualize:
+        plt.show()
+    else:
+        plt.close()
+    
+    print(f"PCA visualization saved to: {output_path}")
+    print(f"PCA explained variance ratio: {pca.explained_variance_ratio_}")
+    
+    return pca_image_pil
+
+def dense_matching(image, processor, model, output_path, visualize=False, second_image_url=None):
+    """Perform dense feature matching between two images."""
+    if second_image_url is None:
+        print("Error: Dense matching requires a second image. Use --second_image_url argument.")
+        return None
+    
+    print("Performing dense matching between two images...")
+    
+    # Load second image
+    try:
+        from transformers.image_utils import load_image
+        image2 = load_image(second_image_url)
+        print(f"Second image loaded! Size: {image2.size}")
+    except:
+        # Fallback to custom loader
+        image2 = load_image_from_source(second_image_url, None)
+        print(f"Second image loaded with custom loader! Size: {image2.size}")
+    
+    # Extract features for both images
+    features1 = extract_features_with_registers(image, processor, model)
+    features2 = extract_features_with_registers(image2, processor, model)
+    
+    patch_features1 = features1['patch_features_flat'].cpu().numpy().squeeze(0)  # [num_patches, hidden_size]
+    patch_features2 = features2['patch_features_flat'].cpu().numpy().squeeze(0)
+    
+    # Compute similarity matrix
+    similarity_matrix = np.dot(patch_features1, patch_features2.T)  # [num_patches1, num_patches2]
+    
+    # Find best matches for each patch in image1
+    best_matches = np.argmax(similarity_matrix, axis=1)
+    
+    # Get spatial dimensions
+    spatial_dims1 = features1['spatial_dims']
+    spatial_dims2 = features2['spatial_dims']
+    
+    # Create visualization
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+    
+    ax1.imshow(image)
+    ax1.set_title("Image 1")
+    ax1.axis('off')
+    
+    ax2.imshow(image2)
+    ax2.set_title("Image 2")
+    ax2.axis('off')
+    
+    # Visualize similarity matrix
+    im3 = ax3.imshow(similarity_matrix, cmap='viridis')
+    ax3.set_title("Patch Similarity Matrix")
+    ax3.set_xlabel("Image 2 Patches")
+    ax3.set_ylabel("Image 1 Patches")
+    plt.colorbar(im3, ax=ax3)
+    
+    # Show some matching lines (sample for visualization)
+    ax4.imshow(np.concatenate([np.array(image), np.array(image2)], axis=1))
+    ax4.set_title("Feature Correspondences (Sample)")
+    ax4.axis('off')
+    
+    # Draw some correspondence lines
+    patch_size1 = image.size[0] // spatial_dims1[1]
+    patch_size2 = image2.size[0] // spatial_dims2[1]
+    
+    for i in range(0, len(best_matches), len(best_matches) // 10):  # Sample 10 matches
+        # Get patch positions
+        y1, x1 = divmod(i, spatial_dims1[1])
+        y2, x2 = divmod(best_matches[i], spatial_dims2[1])
+        
+        # Convert to image coordinates
+        img_x1 = x1 * patch_size1 + patch_size1 // 2
+        img_y1 = y1 * patch_size1 + patch_size1 // 2
+        img_x2 = x2 * patch_size2 + patch_size2 // 2 + image.size[0]  # Offset for concatenated image
+        img_y2 = y2 * patch_size2 + patch_size2 // 2
+        
+        # Draw line
+        ax4.plot([img_x1, img_x2], [img_y1, img_y2], 'r-', alpha=0.6, linewidth=1)
+        ax4.plot(img_x1, img_y1, 'ro', markersize=3)
+        ax4.plot(img_x2, img_y2, 'go', markersize=3)
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    
+    if visualize:
+        plt.show()
+    else:
+        plt.close()
+    
+    print(f"Dense matching visualization saved to: {output_path}")
+    print(f"Average similarity: {similarity_matrix.mean():.4f}")
+    print(f"Max similarity: {similarity_matrix.max():.4f}")
+    
+    return similarity_matrix
+
 def get_task_handler(task: str):
     """Get the appropriate handler function for the task."""
     handlers = {
         "feature_extraction": feature_extraction,
         "instance_segmentation": instance_segmentation,
+        "pca_visualization": pca_visualization,
+        "dense_matching": dense_matching,
     }
     return handlers.get(task)
 
@@ -621,6 +794,8 @@ def print_available_tasks():
     print("Available tasks:")
     print("  - feature_extraction: Extract DINOv3 features and visualize")
     print("  - instance_segmentation: Demo segmentation (untrained head)")
+    print("  - pca_visualization: Create PCA visualization of features")
+    print("  - dense_matching: Match features between two images")
 
 def main(args):
     """Main function to perform the specified task with DINOv3."""
@@ -633,13 +808,14 @@ def main(args):
     print("Local image:", args.local_image if args.local_image else "N/A")
     print("Output image path:", args.output_image)
     print("Quantization:", args.use_quantization)
+    print("Debug mode:", args.debug)
     if args.visualize:
         print("Visualization enabled (output will be displayed)")
 
     try:
-        # Setup model
-        processor_or_pipeline, model = setup_model(args.model, args.task, args.use_quantization)
-        if processor_or_pipeline is None:
+        # Setup model - now returns model, processor, device
+        model_or_pipeline, processor, device = setup_model(args)
+        if model_or_pipeline is None:
             print("Model setup failed. Exiting.")
             return
 
@@ -652,13 +828,15 @@ def main(args):
                 try:
                     from transformers.image_utils import load_image
                     image = load_image(args.image_url)
-                    print(f"Image loaded with transformers utility! Size: {image.size}")
+                    if args.debug:
+                        logger.info(f"Image loaded with transformers utility! Size: {image.size}")
                 except:
                     # Fallback to custom loader
                     image = load_image_from_source(args.image_url, None)
-                    print(f"Image loaded with custom loader! Size: {image.size}")
+                    if args.debug:
+                        logger.info(f"Image loaded with custom loader! Size: {image.size}")
         except Exception as e:
-            print(f"Error loading image: {e}")
+            logger.error(f"Error loading image: {e}")
             return
 
         # Execute task
@@ -666,18 +844,36 @@ def main(args):
         if task_handler:
             try:
                 # Handle both pipeline and manual approaches
-                if hasattr(processor_or_pipeline, 'model'):  # This is a pipeline
-                    print("Using pipeline-based approach...")
-                    result = task_handler(
-                        image, processor_or_pipeline, None,  # model is None for pipeline
-                        args.output_image, args.visualize
-                    )
+                if hasattr(model_or_pipeline, 'model'):  # This is a pipeline
+                    if args.debug:
+                        logger.info("Using pipeline-based approach...")
+                    
+                    # Special handling for dense_matching which needs second image
+                    if args.task == "dense_matching":
+                        result = task_handler(
+                            image, model_or_pipeline, None,  # model is None for pipeline
+                            args.output_image, args.visualize, args.second_image_url
+                        )
+                    else:
+                        result = task_handler(
+                            image, model_or_pipeline, None,  # model is None for pipeline
+                            args.output_image, args.visualize
+                        )
                 else:
-                    print("Using manual model approach...")
-                    result = task_handler(
-                        image, processor_or_pipeline, model, 
-                        args.output_image, args.visualize
-                    )
+                    if args.debug:
+                        logger.info("Using manual model approach...")
+                    
+                    # Special handling for dense_matching which needs second image
+                    if args.task == "dense_matching":
+                        result = task_handler(
+                            image, processor, model_or_pipeline, 
+                            args.output_image, args.visualize, args.second_image_url
+                        )
+                    else:
+                        result = task_handler(
+                            image, processor, model_or_pipeline, 
+                            args.output_image, args.visualize
+                        )
                 
                 if result is not None:
                     print(f"\n{args.task.replace('_', ' ').title()} completed successfully!")
@@ -686,7 +882,7 @@ def main(args):
                     print(f"\n{args.task.replace('_', ' ').title()} was skipped or failed.")
                     
             except Exception as e:
-                print(f"Error during {args.task}: {e}")
+                logger.error(f"Error during {args.task}: {e}")
                 if args.debug:
                     import traceback
                     traceback.print_exc()
@@ -701,7 +897,7 @@ def main(args):
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        logger.error(f"Unexpected error: {e}")
         if args.debug:
             import traceback
             traceback.print_exc()

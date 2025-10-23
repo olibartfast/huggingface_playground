@@ -1,3 +1,16 @@
-transformers
-sam2
-huggingface_hub
+# Core dependencies for DINOv3 updated script
+transformers>=4.40.0
+torch>=2.0.0
+torchvision>=0.15.0
+pillow>=8.3.0
+numpy>=1.21.0
+matplotlib>=3.5.0
+scikit-learn>=1.0.0
+requests>=2.25.0
+
+# Optional dependencies
+huggingface_hub>=0.16.0
+sam2  # For SAM integration if needed
+
+# Advanced quantization (optional)
+# torchao  # Uncomment if using quantization features
