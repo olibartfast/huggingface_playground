@@ -77,8 +77,8 @@ Unit tests are managed by GoogleTest.
    ```
 
  # Resources
- https://huggingface.co/docs/transformers/tasks/video_classification
- https://huggingface.co/docs/transformers/model_doc/vjepa2
- https://huggingface.co/docs/transformers/model_doc/videomae
- https://huggingface.co/docs/transformers/model_doc/vivit
- https://huggingface.co/docs/transformers/model_doc/timesformer
+ - https://huggingface.co/docs/transformers/tasks/video_classification
+ - https://huggingface.co/docs/transformers/model_doc/vjepa2
+ - https://huggingface.co/docs/transformers/model_doc/videomae
+ - https://huggingface.co/docs/transformers/model_doc/vivit
+ - https://huggingface.co/docs/transformers/model_doc/timesformer
