@@ -1,0 +1,10 @@
+{
+    "name": "video-classification",
+    "version-string": "1.0.0",
+    "dependencies": [
+        "fmt",
+        "gtest",
+        "rapidjson",
+        "spdlog"
+    ]
+}
