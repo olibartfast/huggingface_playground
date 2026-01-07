@@ -1,6 +1,6 @@
 # Video Classification Project
 
-This project implements a C++ video classification application using Triton Inference Server and OpenCV. It demonstrates modern C++ practices, including dependency management with vcpkg and CMake.
+This project implements a C++ video classification application to infer [Hugging Face video models](https://huggingface.co/docs/transformers/tasks/video_classification) using Triton Inference Server and OpenCV. 
 
 ## Prerequisites
 
@@ -75,3 +75,10 @@ Unit tests are managed by GoogleTest.
    cd build/debug
    ctest --output-on-failure
    ```
+
+ # Resources
+ https://huggingface.co/docs/transformers/tasks/video_classification
+ https://huggingface.co/docs/transformers/model_doc/vjepa2
+ https://huggingface.co/docs/transformers/model_doc/videomae
+ https://huggingface.co/docs/transformers/model_doc/vivit
+ https://huggingface.co/docs/transformers/model_doc/timesformer
