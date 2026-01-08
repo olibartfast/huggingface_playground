@@ -57,11 +57,11 @@ The main executable `video_classification_app` takes a video file as input.
 - `-m <model_name>`: Model name on Triton server (default: `videomae_large`)
 - `-u <url>`: Triton server URL (default: `http://localhost:8000`)
 - `-b <batch_size>`: Batch size (default: 1)
-- `-l <labels_file>`: Path to labels file (default: `kinetics400.txt`)
+- `-l <labels_file>`: Path to labels file (default: `labels/kinetics400.txt`)
 
 ### Example:
 ```bash
-./build/debug/src/app/video_classification_app -l kinetics400.txt /path/to/my/video.mp4
+./build/debug/src/app/video_classification_app -l labels/kinetics400.txt /path/to/my/video.mp4
 ```
 
 ## Testing
