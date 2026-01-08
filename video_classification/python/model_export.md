@@ -67,76 +67,19 @@ This determines "which class belongs" based on *your* specific training data. If
     python export.py
     ```
 
-## Training Examples
+    ```bash
+    python export.py
+    ```
 
-Here is how you typically use these models before or after export.
+## Training Custom Classifiers
 
-### 1. Using a Base Model (Embeddings)
-
-**Scenario**: You want to classify videos into your own 5 custom classes, but you only have a generic Base model (like `videomae-base`).
-
-**Workflow**:
-1.  **Extract features**: Run your videos through the Base model to get embeddings.
-2.  **Train Classifier**: Train a lightweight classifier (Linear Probe) on these embeddings.
-
-```python
-import numpy as np
-from sklearn.linear_model import LogisticRegression
-
-# 1. Assume you ran the ONNX model and collected embeddings for your dataset
-# Shape: [Num_Samples, Vector_Dim] (e.g. you averaged the patches)
-X_train = np.load("my_train_embeddings.npy") 
-y_train = np.load("my_train_labels.npy")      # e.g. [0, 1, 0, 4, ...]
-
-# 2. Train a simple Linear Classifier (Linear Probe)
-# This is very fast (seconds to minutes)
-clf = LogisticRegression(max_iter=1000)
-clf.fit(X_train, y_train)
-
-# 3. Save this classifier
-import joblib
-joblib.dump(clf, "my_custom_classifier.pkl")
-
-# 4. Inference
-# Video -> Base Model (ONNX) -> Embedding -> clf.predict(Embedding) -> Class
-```
-
-### 2. Using a Finetuned Model (Transfer Learning)
-
-**Scenario**: You have a model that already detects classes (like `videomae-k400` which detects 400 actions), but you want it to detect *your* specific classes (e.g., "Safe" vs "Unsafe").
-
-**Workflow**:
-1.  **Replace Head**: You must modify the model in PyTorch *before* exporting.
-2.  **Retrain**: You freeze the backbone and only train the new head.
-
-```python
-from transformers import AutoModelForVideoClassification
-
-# 1. Load the existing finetuned model
-model_id = "MCG-NJU/videomae-base-finetuned-kinetics"
-model = AutoModelForVideoClassification.from_pretrained(
-    model_id,
-    ignore_mismatched_sizes=True, # Essential for replacing head
-    num_labels=2,                 # Your new number of classes
-    id2label={0: "Safe", 1: "Unsafe"},
-    label2id={"Safe": 0, "Unsafe": 1}
-)
-
-# 2. Freeze the backbone (Optional but recommended)
-for param in model.videomae.parameters():
-    param.requires_grad = False
-
-# 3. Train this model using standard PyTorch training loop...
-# ...
-
-# 4. Export ONLY after training
-# Now the model outputs 2 logits instead of 400.
-# You can use the export.py script on this new local model.
-```
+For instructions on how to train your own classifiers (using Linear Probes or Full Finetuning) using these models, please refer to:
+👉 **[python/training.md](training.md)**
 
 ## Technical Details
 
 The script uses a `UniversalVideoWrapper` class to solve common export issues:
+
 
 *   **Tuple Unpacking**: Automatically handles models that return tuples or specific output objects (like `ImageClassifierOutput`) by extracting the relevant tensor.
 *   **Dynamic Axes**: Sets batch size as a dynamic axis, allowing flexible batch sizes during inference.
