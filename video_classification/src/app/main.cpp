@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
   std::string model_name = "videomae_large";
   std::string url = "http://localhost:8000";
   std::string video_path;
-  std::string labels_file = "kinetics400.txt"; // Default to kinetics400.txt
+  std::string labels_file = "labels/kinetics400.txt"; 
   int batch_size = 1;
   int window_size = 16;
 
