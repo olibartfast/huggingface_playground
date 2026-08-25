@@ -1,0 +1,10 @@
+{
+  "model": "videoprism",
+  "split": 1,
+  "head": "linear",
+  "top1": 63.14,
+  "top5": 90.92,
+  "train_clips": 3570,
+  "test_clips": 1530,
+  "feature_dim": 768
+}

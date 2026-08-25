@@ -1,0 +1,10 @@
+{
+  "name": "videoprism",
+  "repo_id": "google/videoprism-base-f16r288",
+  "revision": "refs/pr/4",
+  "adapter": "videoprism",
+  "num_frames": 16,
+  "pooling": "mean",
+  "batch_size": 8,
+  "dtype": "float16"
+}

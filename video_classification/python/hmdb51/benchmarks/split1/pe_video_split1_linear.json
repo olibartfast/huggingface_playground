@@ -1,0 +1,10 @@
+{
+  "model": "pe_video",
+  "split": 1,
+  "head": "linear",
+  "top1": 77.84,
+  "top5": 96.08,
+  "train_clips": 3570,
+  "test_clips": 1530,
+  "feature_dim": 1792
+}

@@ -1,0 +1,65 @@
+{
+  "dataset": "HMDB-51",
+  "split": 1,
+  "protocol": "official testTrainMulti_7030_splits",
+  "train_clips": 3570,
+  "test_clips": 1530,
+  "num_classes": 51,
+  "method": "frozen encoder + linear probe, 200 epochs, AdamW, features standardised on train stats",
+  "hardware": "NVIDIA GeForce RTX 3060 Laptop (6 GB), fp16 inference",
+  "note": "top-1 is mean +/- std over 5 probe runs on identical cached features; the probe sets no seed. Treat gaps under ~0.5 pp as noise.",
+  "caveat": "Ranks mean-pooled linear probing, not backbone capability. V-JEPA 2 is penalised by mean-pooling ~8192 tokens; its own classifier uses an attentive pooler.",
+  "models": {
+    "videoprism": {
+      "repo_id": "google/videoprism-base-f16r288",
+      "feature_dim": 768,
+      "num_frames": 16,
+      "pooling": "mean",
+      "top1_runs": [
+        63.33,
+        63.01,
+        63.07,
+        63.4,
+        63.07
+      ],
+      "top1_mean": 63.18,
+      "top1_std": 0.18,
+      "top5": 90.92,
+      "extraction_minutes_5100_clips": 12
+    },
+    "vjepa2": {
+      "repo_id": "facebook/vjepa2-vitl-fpc64-256",
+      "feature_dim": 1024,
+      "num_frames": 64,
+      "pooling": "mean",
+      "top1_runs": [
+        62.35,
+        63.01,
+        63.07,
+        62.94,
+        62.81
+      ],
+      "top1_mean": 62.84,
+      "top1_std": 0.29,
+      "top5": 90.07,
+      "extraction_minutes_5100_clips": 83
+    },
+    "pe_video": {
+      "repo_id": "facebook/pe-av-large-16-frame",
+      "feature_dim": 1792,
+      "num_frames": 16,
+      "pooling": "pooler",
+      "top1_runs": [
+        77.19,
+        77.19,
+        77.39,
+        77.19,
+        77.19
+      ],
+      "top1_mean": 77.23,
+      "top1_std": 0.09,
+      "top5": 96.08,
+      "extraction_minutes_5100_clips": 44
+    }
+  }
+}

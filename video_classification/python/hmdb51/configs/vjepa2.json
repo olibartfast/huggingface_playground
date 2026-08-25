@@ -1,0 +1,9 @@
+{
+  "name": "vjepa2",
+  "repo_id": "facebook/vjepa2-vitl-fpc64-256",
+  "adapter": "vjepa2",
+  "num_frames": 64,
+  "pooling": "mean",
+  "batch_size": 4,
+  "dtype": "float16"
+}
