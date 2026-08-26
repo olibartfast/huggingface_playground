@@ -2,6 +2,12 @@
 
 This project implements a C++ video classification application that performs inference on [Hugging Face video models](https://huggingface.co/docs/transformers/tasks/video_classification)  using Triton Inference Server and OpenCV.
 
+> **Looking for the HMDB-51 benchmark?** See [`python/hmdb51`](python/hmdb51/README.md).
+> It evaluates V-JEPA 2, VideoPrism and PE Video with frozen encoders and a linear
+> probe. Those backbones ship no HMDB-51 classification head, so they cannot be
+> served by the Triton pipeline documented here until a head is trained on the
+> cached features.
+
 
 ## Prerequisites
 

@@ -7,7 +7,7 @@ C++ and Python implementations for Hugging Face models, focusing on computer vis
 - **Multi-Modal Models**: Qwen2.5-VL, CLIP, Grounding DINO, and OwlViT/OwlV2
 - **Vision Models**: Depth estimation, DINOv3, ViTPose, RT-DETR, and SAM2
 - **Pose Estimation**: ViTPose for human pose estimation
-- **Video Classification**: C++ implementation using Triton Inference Server
+- **Video Classification**: C++ implementation using Triton Inference Server, plus a Python HMDB-51 benchmark for V-JEPA 2, VideoPrism and PE Video
 - **Hugging Face Inference Provider Client**: C++ Client for Hugging Face Serverless API
 - **Visualization Tools**: Built-in plotting and visualization
 - **Modular Architecture**: Specialized requirements for different model families
@@ -18,6 +18,19 @@ C++ and Python implementations for Hugging Face models, focusing on computer vis
 - **huggingface-inference-provider-cpp-client**: C++ client for Hugging Face Serverless Inference API. Supports object detection, image classification, image segmentation, and image-text-to-text generation. Uses `libcurl`, `OpenCV`, and `nlohmann/json`.
 - **pose_estimation**: C++ application for pose estimation using ViTPose models exported to ONNX Runtime.
 - **video_classification**: C++ application for video classification (e.g., VideoMAE) using Triton Inference Server, OpenCV, and C++20.
+
+### Benchmarks
+- **video_classification/python/hmdb51**: HMDB-51 frozen-probe benchmark for three recent video backbones. None of them ship an HMDB-51 head, so the encoder is frozen, clip embeddings are cached once, and a linear probe is fitted on the cached features. Includes a dataset fetcher, resumable extraction, and a smoke test that validates every backbone before a long run. See its [README](video_classification/python/hmdb51/README.md).
+
+  Official split 1 (3570 train / 1530 test), linear probe, mean of 5 runs on an RTX 3060 Laptop:
+
+  | Backbone | Dim | top-1 | top-5 |
+  |---|---|---|---|
+  | PE Video (`facebook/pe-av-large-16-frame`) | 1792 | **77.23 ± 0.09** | 96.08 |
+  | VideoPrism base (`google/videoprism-base-f16r288`) | 768 | 63.18 ± 0.18 | 90.92 |
+  | V-JEPA 2 ViT-L (`facebook/vjepa2-vitl-fpc64-256`) | 1024 | 62.84 ± 0.29 | 90.07 |
+
+  This ranks *mean-pooled linear probing*, not backbone capability — V-JEPA 2 is penalised by averaging ~8192 patch tokens, while its own classifier uses an attentive pooler.
 
 ### Python examples
 - **multimodal_models**: Python scripts for multimodal tasks, including:
@@ -146,6 +159,12 @@ C++ and Python implementations for Hugging Face models, focusing on computer vis
 - **RT-DETRv2**: Real-time object detection
 - **SAM2**: Universal object segmentation
 
+### Video Models
+- **VideoMAE / ViViT / TimeSformer**: Kinetics-400 classification served through Triton (C++)
+- **V-JEPA 2**: Self-supervised video encoder (no released HMDB-51 head; probed)
+- **VideoPrism**: Factorised spatio-temporal encoder (probed)
+- **PE Video**: Perception Encoder video tower, CLIP-style video/text (probed)
+
 ### Inference Methods
 - **Pipeline API**: High-level interface
 - **AutoModel**: Lower-level control with custom processing
@@ -159,6 +178,8 @@ C++ and Python implementations for Hugging Face models, focusing on computer vis
 - [Multi-Modal Models](https://huggingface.co/docs/transformers/model_doc/clip): CLIP and other vision-language models.
 - [Depth Estimation](https://huggingface.co/docs/transformers/model_doc/depth_anything_v2): Monocular depth estimation techniques.
 - [Self-Supervised Learning](https://huggingface.co/docs/transformers/model_doc/dinov2): DINOv2 and representation learning.
+- [Video Classification](https://huggingface.co/docs/transformers/tasks/video_classification): Task guide for video models.
+- [V-JEPA 2](https://huggingface.co/docs/transformers/model_doc/vjepa2), [VideoPrism](https://huggingface.co/docs/transformers/model_doc/videoprism), [PE Video](https://huggingface.co/docs/transformers/model_doc/pe_video): The three backbones covered by the HMDB-51 benchmark.
 - [Deep Learning Containers](https://huggingface.co/docs/sagemaker/index#deep-learning-containers): Amazon SageMaker and Google Cloud integrations.
 - [PyTorch Tutorials](https://github.com/philschmid/deep-learning-pytorch-huggingface): Deep learning with PyTorch and Hugging Face.
 - [NVIDIA Triton Server](https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace): Deploying models with Triton.
