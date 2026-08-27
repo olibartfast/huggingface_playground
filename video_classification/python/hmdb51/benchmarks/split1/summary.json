@@ -60,6 +60,83 @@
       "top1_std": 0.09,
       "top5": 96.08,
       "extraction_minutes_5100_clips": 44
+    },
+    "pe_video_small": {
+      "repo_id": "facebook/pe-av-small-16-frame",
+      "feature_dim": 768,
+      "num_frames": 16,
+      "pooling": "pooler",
+      "top1_runs": [
+        76.08,
+        76.14,
+        76.08,
+        75.95,
+        75.95
+      ],
+      "top1_mean": 76.04,
+      "top1_std": 0.09,
+      "top5": 94.84,
+      "extraction_minutes_5100_clips": 44,
+      "note": "probe run on CPU; the GPU was occupied by an unrelated process"
     }
+  },
+  "latency_rtx3060_laptop_batch1_fp16": {
+    "method": "frames pre-decoded; median of 20 runs after 3 warm-up iterations",
+    "videoprism": {
+      "frames": 16,
+      "gpu_median_ms": 165.2,
+      "gpu_p90_ms": 167.3,
+      "decode_ms": 80.5
+    },
+    "pe_video": {
+      "frames": 16,
+      "gpu_median_ms": 534.8,
+      "gpu_p90_ms": 545.7,
+      "decode_ms": 75.2
+    },
+    "vjepa2": {
+      "frames": 64,
+      "gpu_median_ms": 969.5,
+      "gpu_p90_ms": 981.1,
+      "decode_ms": 87.4,
+      "note": "also needs 64 frames buffered = 2.6 s of inherent stream latency at 25 fps"
+    }
+  },
+  "feature_width_control": {
+    "method": "PCA fit on train split only, applied to both splits; mean of 3 probe runs",
+    "pe_video_full_1792d": 77.25,
+    "pe_video_pca_1024d": 73.01,
+    "pe_video_pca_768d": 71.85,
+    "conclusion": "PE Video still leads by ~9 pp at VideoPrism's 768-d width; the 14 pp gap is not a probe-capacity artifact."
+  },
+  "pe_av_size_family": {
+    "finding": "small/base/large describe only the 4-layer temporal fusion encoder (768/1024/1792). All three share the same per-frame vision backbone, vit_pe_core_large_patch14_336, where essentially all compute goes.",
+    "evidence": "small and large extract 3570 clips in 30.8 and 31.0 minutes respectively - identical within noise.",
+    "implication": "Choosing a smaller PE-AV checkpoint buys capacity, not speed.",
+    "accuracy": {
+      "pe-av-small-16-frame": 76.04,
+      "pe-av-large-16-frame": 77.23,
+      "gap_pp": 1.19,
+      "download_gb": {
+        "small": 3.39,
+        "base": 4.14,
+        "large": 8.94
+      }
+    },
+    "latency": {
+      "per_clip_end_to_end_ms": {
+        "small": {
+          "train": 517.6,
+          "test": 525.5
+        },
+        "large": {
+          "train": 521.0,
+          "test": 517.6
+        }
+      },
+      "conclusion": "Difference changes sign between passes, so it is within noise (~+/-1.5%). Large's 535 ms is directly measured; small's is derived from aggregate throughput.",
+      "recommendation": "pe-av-small-16-frame is the better deployment pick: same latency, 5.5 GB smaller, 1.2 pp less accurate."
+    },
+    "base_not_benchmarked": "configs/pe_video_base.json is provided but was not run; it will interpolate."
   }
 }

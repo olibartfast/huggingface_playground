@@ -1,0 +1,12 @@
+{
+  "name": "pe_video_base",
+  "repo_id": "facebook/pe-av-base-16-frame",
+  "adapter": "pe_video",
+  "num_frames": 16,
+  "pooling": "pooler",
+  "batch_size": 4,
+  "dtype": "float16",
+  "processor_kwargs": {
+    "num_frames": 16
+  }
+}

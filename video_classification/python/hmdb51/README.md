@@ -19,6 +19,7 @@ mean-pooled (PE Video: CLS) features, linear probe, 200 epochs. Mean ± std over
 | Backbone | Dim | top-1 | top-5 | Extraction (5100 clips) |
 |---|---|---|---|---|
 | **PE Video** (`pe-av-large-16-frame`) | 1792 | **77.23 ± 0.09** | 96.08 | 44 min |
+| PE Video (`pe-av-small-16-frame`) | 768 | 76.04 ± 0.09 | 94.84 | 44 min |
 | VideoPrism base | 768 | 63.18 ± 0.18 | 90.92 | 12 min |
 | V-JEPA 2 ViT-L | 1024 | 62.84 ± 0.29 | 90.07 | 83 min |
 
@@ -40,6 +41,42 @@ The probe does not set a random seed, hence the ± figures. Treat any gap under
 Raw measurements, including the individual per-run top-1 values behind each ±,
 are committed in [`benchmarks/split1/`](benchmarks/split1/). `results/` is where
 a fresh run writes its own output and is gitignored.
+
+### Does the wider feature explain PE Video's lead?
+
+Partly, but not mostly. PE Video's probe has 91k parameters against VideoPrism's
+39k purely because its features are wider. Projecting PE Video's cached features
+down with PCA (fit on train only) isolates that effect:
+
+| PE Video features | top-1 |
+|---|---|
+| full 1792-d | 77.25% |
+| PCA → 1024-d (100.0% variance retained) | 73.01% |
+| PCA → 768-d (99.9% variance retained) | 71.85% |
+
+At VideoPrism's own 768-d width PE Video still leads by ~9 points, so the
+14-point gap is not a probe-capacity artifact. Worth noting that dropping to
+768-d costs 5.4 points while retaining 99.9% of the variance — the
+discriminative directions sit in low-variance components that PCA throws away,
+which is a good reminder that "variance retained" is a poor proxy for
+"information retained" when the downstream task is classification.
+
+### Inference latency
+
+Single clip, batch 1, fp16, frames pre-decoded so only the model path is timed;
+median of 20 runs after warm-up, on an RTX 3060 Laptop:
+
+| Model | Frames | GPU median | p90 | Decode | Total per window |
+|---|---|---|---|---|---|
+| VideoPrism base | 16 | **165 ms** | 167 ms | 80 ms | ~245 ms (4.1/s) |
+| PE Video large | 16 | 535 ms | 546 ms | 75 ms | ~610 ms (1.6/s) |
+| V-JEPA 2 ViT-L | 64 | 970 ms | 981 ms | 87 ms | ~1057 ms (0.95/s) |
+
+For streaming, V-JEPA 2 carries a second cost that is not compute: it needs
+**64 frames buffered** before it can run at all, which at 25 fps is 2.6 s of
+inherent latency. The 16-frame models need 0.64 s. VideoPrism is the only one
+of the three that is comfortably real-time on this hardware; PE Video buys
++14 points of accuracy for ~3.2× the latency.
 
 ## Why a probe, and not just inference
 
@@ -173,6 +210,51 @@ Three things that are not obvious from the model docs, all found by running them
   the latter has `num_frames: null` (fps-based sampling), ambiguous for a
   fixed benchmark.
 - **PE Video needs `timm`** — its vision backbone loads through `TimmWrapper`.
+
+### PE-AV "small / base / large" are not compute tiers
+
+This one is a trap. The PE-AV family looks like a YOLO-style size ladder, but
+the labels describe **only the 4-layer temporal fusion encoder**. Every size runs
+the *same* per-frame vision backbone:
+
+| Checkpoint | Fusion encoder | Vision backbone |
+|---|---|---|
+| `pe-av-small-16-frame` | 768-d, 4 layers, 6 heads | `vit_pe_core_large_patch14_336` |
+| `pe-av-base-16-frame` | 1024-d, 4 layers, 8 heads | `vit_pe_core_large_patch14_336` |
+| `pe-av-large-16-frame` | 1792-d, 4 layers, 14 heads | `vit_pe_core_large_patch14_336` |
+
+All three run a PE-Core **Large** ViT over every frame, and that pass is where
+essentially all the compute goes.
+
+Per-clip end-to-end time, derived from the extraction runs (same batch size,
+same decode workers, same clips):
+
+| Pass | `small` | `large` |
+|---|---|---|
+| train (3570 clips) | 517.6 ms/clip | 521.0 ms/clip |
+| test (1530 clips) | 525.5 ms/clip | 517.6 ms/clip |
+
+The two passes disagree on the *sign* of the difference, which places it inside
+measurement noise — bounded at roughly ±1.5%, under ~8 ms against large's
+directly measured 535 ms. Treat the two as having identical latency. (Large's
+535 ms is a direct measurement; small's figure is derived from aggregate
+throughput, since the GPU was occupied when this was written.)
+
+And the accuracy difference is small too: **76.04 ± 0.09 vs 77.23 ± 0.09**, a
+1.2 pp gap for 2.3× the fusion width and 2.6× the download (3.39 vs 8.94 GB).
+
+**So `pe-av-small-16-frame` is the better deployment pick** — same latency, 5.5 GB
+less to download and hold, 1.2 pp of accuracy given up. And if PE Video is too
+slow for your latency budget, the levers are a different backbone, fewer frames,
+or a resolution below 336px — *not* a smaller PE-AV checkpoint. The sizes trade
+capacity, not compute.
+
+`configs/pe_video_base.json` (1024-d fusion) is provided but **not benchmarked**;
+it will interpolate between the two rows above.
+
+An aside worth keeping: small's *native* 768-d features score 76.04, while
+large's features PCA-compressed to 768-d score only 71.85. Same width, 4.2 points
+apart — a trained narrow encoder retains what PCA discards.
 
 ## Requirements
 

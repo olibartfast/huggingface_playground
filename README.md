@@ -24,13 +24,14 @@ C++ and Python implementations for Hugging Face models, focusing on computer vis
 
   Official split 1 (3570 train / 1530 test), linear probe, mean of 5 runs on an RTX 3060 Laptop:
 
-  | Backbone | Dim | top-1 | top-5 |
-  |---|---|---|---|
-  | PE Video (`facebook/pe-av-large-16-frame`) | 1792 | **77.23 ± 0.09** | 96.08 |
-  | VideoPrism base (`google/videoprism-base-f16r288`) | 768 | 63.18 ± 0.18 | 90.92 |
-  | V-JEPA 2 ViT-L (`facebook/vjepa2-vitl-fpc64-256`) | 1024 | 62.84 ± 0.29 | 90.07 |
+  | Backbone | Dim | top-1 | top-5 | Latency/clip |
+  |---|---|---|---|---|
+  | PE Video (`facebook/pe-av-large-16-frame`) | 1792 | **77.23 ± 0.09** | 96.08 | 535 ms |
+  | PE Video (`facebook/pe-av-small-16-frame`) | 768 | 76.04 ± 0.09 | 94.84 | ~535 ms |
+  | VideoPrism base (`google/videoprism-base-f16r288`) | 768 | 63.18 ± 0.18 | 90.92 | **165 ms** |
+  | V-JEPA 2 ViT-L (`facebook/vjepa2-vitl-fpc64-256`) | 1024 | 62.84 ± 0.29 | 90.07 | 970 ms |
 
-  This ranks *mean-pooled linear probing*, not backbone capability — V-JEPA 2 is penalised by averaging ~8192 patch tokens, while its own classifier uses an attentive pooler.
+  This ranks *mean-pooled linear probing*, not backbone capability — V-JEPA 2 is penalised by averaging ~8192 patch tokens, while its own classifier uses an attentive pooler. Note that PE's small/base/large labels size only the temporal fusion encoder; all three share one PE-Core Large ViT backbone, so a smaller checkpoint buys capacity, not speed.
 
 ### Python examples
 - **multimodal_models**: Python scripts for multimodal tasks, including:
